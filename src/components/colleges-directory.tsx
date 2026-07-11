@@ -80,16 +80,20 @@ function CollegesDirectoryInner() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="container-page py-10">
-      <div className="mb-8">
-        <h1 className="font-display text-4xl">Colleges</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {data ? `${data.total} ${data.total === 1 ? "college" : "colleges"}` : "Loading…"}
-        </p>
+    <div className="container-page py-8 md:py-10">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl md:text-4xl">Colleges</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data
+              ? `${data.total.toLocaleString()} ${data.total === 1 ? "college" : "colleges"} in catalog`
+              : "Loading…"}
+          </p>
+        </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-        <aside className="space-y-6 rounded-xl border border-border bg-card p-5 lg:sticky lg:top-24 lg:self-start">
+      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="space-y-4 rounded-xl border border-border bg-card p-4 lg:sticky lg:top-24">
           <FilterInput label="Search" value={filters.q ?? ""} onChange={(v) => setParam({ q: v || undefined })} placeholder="Name, city, alias…" />
           <FilterInput label="State" value={filters.state ?? ""} onChange={(v) => setParam({ state: v || undefined })} />
           <FilterInput label="City" value={filters.city ?? ""} onChange={(v) => setParam({ city: v || undefined })} />
@@ -115,7 +119,7 @@ function CollegesDirectoryInner() {
             <FilterInput label="Fee max (₹)" value={filters.feeMax?.toString() ?? ""} onChange={(v) => setParam({ feeMax: v ? Number(v) : undefined })} type="number" />
           </div>
           <FilterInput label="Rank band" value={filters.rankBand ?? ""} onChange={(v) => setParam({ rankBand: v || undefined })} placeholder="e.g. 1-10, 41-50" />
-          <div className="flex flex-wrap gap-4 pt-2 text-sm">
+          <div className="flex flex-col gap-2 pt-1 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={!!filters.verified} onChange={(e) => setParam({ verified: e.target.checked || undefined })} />
               Verified only
@@ -130,9 +134,11 @@ function CollegesDirectoryInner() {
           </button>
         </aside>
 
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">{data ? `Page ${data.page} of ${totalPages}` : "Loading…"}</div>
+        <section className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              {data ? `Page ${data.page} of ${totalPages}` : "Loading…"}
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Sort</span>
               <select
@@ -155,7 +161,7 @@ function CollegesDirectoryInner() {
               No colleges match these filters.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="college-results-grid">
               {data.items.map((i) => (
                 <CollegeCard key={i.id} i={i} />
               ))}

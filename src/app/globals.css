@@ -99,6 +99,14 @@
   }
 }
 
+/* Auto-fill so cards stay ~280–340px and never stretch full row width */
+@utility college-results-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  align-items: stretch;
+}
+
 @utility chip {
   display: inline-flex;
   align-items: center;

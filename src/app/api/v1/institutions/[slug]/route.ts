@@ -4,7 +4,7 @@ type Ctx = { params: Promise<{ slug: string }> };
 
 export async function GET(request: Request, ctx: Ctx) {
   const { slug } = await ctx.params;
-  const r = getInstitutionBySlug(slug);
+  const r = await getInstitutionBySlug(slug);
   if (r.kind === "notFound") {
     return new Response("Not found", { status: 404 });
   }

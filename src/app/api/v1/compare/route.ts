@@ -7,5 +7,5 @@ export async function GET(request: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  return Response.json(compareInstitutions(slugs));
+  return Response.json(await compareInstitutions(slugs));
 }

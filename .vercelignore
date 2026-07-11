@@ -1,0 +1,3 @@
+# Express middleware lives under /api and is deployed to Azure, not Vercel.
+api
+api/**

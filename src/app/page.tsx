@@ -2,6 +2,8 @@ import Link from "next/link";
 import { listInstitutions } from "@/lib/api-service";
 import { CollegeCard } from "@/components/college-card";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "MyGuruva — Discover India's colleges",
   description:

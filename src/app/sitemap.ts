@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { sitemapInstitutions } from "@/lib/api-service";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = "https://myguruva.com";
   const { items } = await sitemapInstitutions();

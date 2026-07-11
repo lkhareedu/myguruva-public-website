@@ -84,7 +84,7 @@ function CollegesDirectoryInner() {
       <div className="mb-8">
         <h1 className="font-display text-4xl">Colleges</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {data ? `${data.total} ${data.total === 1 ? "college" : "colleges"} · Published & Active` : "Loading…"}
+          {data ? `${data.total} ${data.total === 1 ? "college" : "colleges"}` : "Loading…"}
         </p>
       </div>
 
@@ -149,13 +149,13 @@ function CollegesDirectoryInner() {
           </div>
 
           {showSkeleton ? (
-            <CollegeGridSkeleton count={6} />
+            <CollegeGridSkeleton count={9} />
           ) : !data || data.items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
               No colleges match these filters.
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {data.items.map((i) => (
                 <CollegeCard key={i.id} i={i} />
               ))}
@@ -163,24 +163,11 @@ function CollegesDirectoryInner() {
           )}
 
           {data && totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              {Array.from({ length: totalPages }).map((_, idx) => {
-                const p = idx + 1;
-                const active = p === data.page;
-                return (
-                  <Link
-                    key={p}
-                    href={`/colleges${filtersToParams({ ...filters, page: p })}`}
-                    className={
-                      "rounded-md border px-3 py-1.5 text-sm " +
-                      (active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")
-                    }
-                  >
-                    {p}
-                  </Link>
-                );
-              })}
-            </div>
+            <Pagination
+              page={data.page}
+              totalPages={totalPages}
+              hrefForPage={(p) => `/colleges${filtersToParams({ ...filters, page: p })}`}
+            />
           )}
         </section>
       </div>
@@ -230,5 +217,88 @@ function FilterSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+function pageWindow(page: number, totalPages: number): Array<number | "…"> {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pages = new Set<number>([1, totalPages, page]);
+  for (let p = page - 1; p <= page + 1; p++) {
+    if (p >= 1 && p <= totalPages) pages.add(p);
+  }
+  if (page <= 3) {
+    pages.add(2);
+    pages.add(3);
+    pages.add(4);
+  }
+  if (page >= totalPages - 2) {
+    pages.add(totalPages - 1);
+    pages.add(totalPages - 2);
+    pages.add(totalPages - 3);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+  const out: Array<number | "…"> = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev && p - prev > 1) out.push("…");
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  hrefForPage,
+}: {
+  page: number;
+  totalPages: number;
+  hrefForPage: (p: number) => string;
+}) {
+  const items = pageWindow(page, totalPages);
+  return (
+    <nav aria-label="Pagination" className="mt-8 flex flex-wrap items-center justify-center gap-2">
+      <Link
+        href={hrefForPage(Math.max(1, page - 1))}
+        aria-disabled={page <= 1}
+        className={
+          "rounded-md border border-border px-3 py-1.5 text-sm " +
+          (page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-muted")
+        }
+      >
+        Previous
+      </Link>
+      {items.map((item, idx) =>
+        item === "…" ? (
+          <span key={`e-${idx}`} className="px-1 text-sm text-muted-foreground">
+            …
+          </span>
+        ) : (
+          <Link
+            key={item}
+            href={hrefForPage(item)}
+            className={
+              "min-w-9 rounded-md border px-3 py-1.5 text-center text-sm " +
+              (item === page
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border hover:bg-muted")
+            }
+          >
+            {item}
+          </Link>
+        ),
+      )}
+      <Link
+        href={hrefForPage(Math.min(totalPages, page + 1))}
+        aria-disabled={page >= totalPages}
+        className={
+          "rounded-md border border-border px-3 py-1.5 text-sm " +
+          (page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-muted")
+        }
+      >
+        Next
+      </Link>
+    </nav>
   );
 }

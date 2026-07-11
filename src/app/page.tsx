@@ -17,7 +17,11 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  const data = await listInstitutions({ featured: true, pageSize: 6, sort: "relevance" });
+  let data = await listInstitutions({ featured: true, pageSize: 6, sort: "relevance" });
+  const usingFeatured = data.items.length > 0;
+  if (!usingFeatured) {
+    data = await listInstitutions({ pageSize: 6, sort: "name" });
+  }
 
   return (
     <div>
@@ -42,7 +46,7 @@ export default async function HomePage() {
               <span className="text-primary">Trust the details.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-              Every listing on MyGuruva is Published + Active. The Verified badge means our team completed a
+              Browse colleges from our CRM catalog. The Verified badge means our team completed a
               two-stage review of the institution&apos;s data.
             </p>
             <form
@@ -75,20 +79,35 @@ export default async function HomePage() {
       </section>
 
       <section className="container-page pb-16">
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <h2 className="font-display text-3xl">Featured colleges</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Hand-picked institutions from our editorial team.</p>
+            <h2 className="font-display text-3xl">
+              {usingFeatured ? "Featured colleges" : "Explore colleges"}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {usingFeatured
+                ? "Hand-picked institutions from our editorial team."
+                : `${data.total.toLocaleString()} colleges in the catalog — start browsing.`}
+            </p>
           </div>
-          <Link href="/colleges" className="text-sm font-medium text-primary hover:underline">
+          <Link href="/colleges" className="shrink-0 text-sm font-medium text-primary hover:underline">
             Browse all →
           </Link>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.items.map((i) => (
-            <CollegeCard key={i.id} i={i} />
-          ))}
-        </div>
+        {data.items.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
+            No colleges available yet.{" "}
+            <Link href="/colleges" className="text-primary hover:underline">
+              Browse directory
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {data.items.map((i) => (
+              <CollegeCard key={i.id} i={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="container-page pb-20">

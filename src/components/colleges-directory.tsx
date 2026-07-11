@@ -92,8 +92,8 @@ function CollegesDirectoryInner() {
         </div>
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="space-y-4 rounded-xl border border-border bg-card p-4 lg:sticky lg:top-24">
+      <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="space-y-4 rounded-xl border border-border bg-card p-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-auto">
           <FilterInput label="Search" value={filters.q ?? ""} onChange={(v) => setParam({ q: v || undefined })} placeholder="Name, city, alias…" />
           <FilterInput label="State" value={filters.state ?? ""} onChange={(v) => setParam({ state: v || undefined })} />
           <FilterInput label="City" value={filters.city ?? ""} onChange={(v) => setParam({ city: v || undefined })} />

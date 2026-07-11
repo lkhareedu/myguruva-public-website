@@ -23,7 +23,7 @@ function initials(name: string) {
 
 export function VerifiedBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--verified)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--verified)] ring-1 ring-[color:var(--verified)]/20 ring-inset">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[color:var(--verified)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--verified)] ring-1 ring-[color:var(--verified)]/20 ring-inset">
       <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <path d="M12 2l2.5 4.9 5.5.9-4 3.9.9 5.4L12 14.8 7.1 17l.9-5.4L4 7.8l5.5-.9L12 2z" />
       </svg>
@@ -33,11 +33,11 @@ export function VerifiedBadge() {
 }
 
 export function CollegeCard({ i }: { i: InstitutionCard }) {
-  const blurb = teaser(i.shortDescription, 108);
+  const blurb = teaser(i.shortDescription, 90);
 
   return (
-    <article className="flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary/35">
-      <div className="flex min-w-0 items-start gap-2.5 border-b border-border/60 px-3.5 pt-3.5 pb-2.5">
+    <article className="college-card transition hover:border-primary/35">
+      <div className="flex min-w-0 items-start gap-2.5 px-3.5 pt-3.5 pb-2">
         <div
           aria-hidden
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold tracking-wide text-primary"
@@ -49,10 +49,11 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
             initials(i.name)
           )}
         </div>
+
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2">
             <Link href={`/colleges/${i.slug}`} className="min-w-0 flex-1 group">
-              <h3 className="line-clamp-2 break-words font-display text-[0.95rem] leading-snug text-foreground group-hover:text-primary">
+              <h3 className="line-clamp-2 font-display text-[0.92rem] leading-snug text-foreground group-hover:text-primary">
                 {i.name}
               </h3>
             </Link>
@@ -63,7 +64,7 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
               className="h-7 w-7 shrink-0"
             />
           </div>
-          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className="min-w-0 truncate">
               {[i.city, i.state].filter(Boolean).join(", ")}
               {i.establishedYear ? ` · ${i.establishedYear}` : ""}
@@ -73,21 +74,28 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
         </div>
       </div>
 
-      <Link
-        href={`/colleges/${i.slug}`}
-        className="flex min-w-0 flex-1 flex-col overflow-hidden px-3.5 pt-2.5 pb-3.5"
-      >
+      <Link href={`/colleges/${i.slug}`} className="flex min-w-0 flex-1 flex-col px-3.5 pb-3.5">
         {blurb ? (
-          <p className="line-clamp-2 min-w-0 overflow-hidden break-words text-[13px] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+          <p
+            className="mt-1 min-h-[2.5rem] min-w-0 text-[12.5px] leading-snug text-muted-foreground"
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+            }}
+          >
             {blurb}
           </p>
         ) : (
-          <div className="flex-1" />
+          <div className="mt-1 min-h-[2.5rem] flex-1" />
         )}
 
-        <div className="mt-auto flex min-w-0 flex-wrap gap-1 pt-2.5">
-          <span className="chip max-w-full truncate">{i.institutionType.label}</span>
-          <span className="chip">{i.ownership.label}</span>
+        <div className="mt-2.5 flex min-w-0 flex-wrap gap-1">
+          <span className="chip max-w-[9.5rem] truncate">{i.institutionType.label}</span>
+          <span className="chip truncate">{i.ownership.label}</span>
           {i.naacGrade?.label && i.naacGrade.label !== "—" ? (
             <span className="chip">NAAC {i.naacGrade.label}</span>
           ) : null}
@@ -97,7 +105,7 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
           <span className="min-w-0 truncate font-medium text-foreground/80">
             {formatFees(i.tuitionMin, i.tuitionMax)}
           </span>
-          <span className="shrink-0">
+          <span className="shrink-0 tabular-nums">
             {i.latestOverallRank != null ? `NIRF #${i.latestOverallRank}` : "Rank —"}
           </span>
         </div>

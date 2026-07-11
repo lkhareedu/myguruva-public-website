@@ -1,4 +1,5 @@
 import { prisma } from "../prisma.js";
+import { env } from "../env.js";
 import {
   FEE_TOTAL,
   FEE_TUITION,
@@ -6,8 +7,12 @@ import {
   RANK_OVERALL,
   REVIEW_COMPLETED,
   ACTIVE,
+  publicSlug,
 } from "../lib/gates.js";
 import { dec, requireOpt } from "../lib/option-sets.js";
+import { buildInstitutionSearchClause } from "../lib/search.js";
+import { hasPgTrgm } from "../lib/trgm.js";
+import { plainTeaser } from "../lib/plain-text.js";
 
 export type ListFilters = {
   q?: string;
@@ -91,34 +96,25 @@ export async function overallRanks(ids: string[]): Promise<Map<string, number | 
 }
 
 async function resolveListIds(f: ListFilters): Promise<string[]> {
-  const conditions: string[] = [
-    `i.wn_publishstatus = ${PUBLISHED}`,
-    `i.wn_currentstatus = ${ACTIVE}`,
-    `i.wn_slug IS NOT NULL`,
-  ];
+  const conditions: string[] = ["i.wn_name IS NOT NULL"];
+  if (!env.relaxPublicGates) {
+    conditions.push(`i.wn_publishstatus = ${PUBLISHED}`);
+    conditions.push(`i.wn_currentstatus = ${ACTIVE}`);
+    conditions.push(`i.wn_slug IS NOT NULL`);
+  }
   const params: unknown[] = [];
   let p = 1;
 
   if (f.q?.trim()) {
-    const q = f.q.trim();
-    conditions.push(`(
-      to_tsvector('simple',
-        coalesce(i.wn_name,'') || ' ' || coalesce(i.wn_city,'') || ' ' || coalesce(i.wn_state,'') || ' ' || coalesce(i.wn_shortdescription,'')
-      ) @@ plainto_tsquery('simple', $${p})
-      OR i.wn_name ILIKE '%' || $${p} || '%'
-      OR i.wn_city ILIKE '%' || $${p} || '%'
-      OR i.wn_state ILIKE '%' || $${p} || '%'
-      OR EXISTS (
-        SELECT 1 FROM institution_alias a
-        WHERE a.wn_institution = i.wn_institutionid
-          AND (
-            to_tsvector('simple', coalesce(a.wn_name,'')) @@ plainto_tsquery('simple', $${p})
-            OR a.wn_name ILIKE '%' || $${p} || '%'
-          )
-      )
-    )`);
-    params.push(q);
-    p++;
+    const clause = buildInstitutionSearchClause(f.q, p, {
+      includeDescription: true,
+      useTrgm: await hasPgTrgm(),
+    });
+    if (clause) {
+      conditions.push(clause.sql);
+      params.push(...clause.params);
+      p = clause.nextParam;
+    }
   }
   if (f.state) {
     conditions.push(`lower(i.wn_state) = lower($${p})`);
@@ -146,6 +142,7 @@ async function resolveListIds(f: ListFilters): Promise<string[]> {
     p++;
   }
   if (f.featured) conditions.push(`i.wn_isfeatured = true`);
+  // Optional filter still works in relax mode; only the default Published/Active/slug gate is skipped.
   if (f.verified) {
     conditions.push(`EXISTS (
       SELECT 1 FROM institution_review r
@@ -221,7 +218,8 @@ export async function listInstitutions(f: ListFilters = {}) {
   const rows = ids
     .map((id) => {
       const i = byId.get(id);
-      if (!i?.wn_slug || !i.wn_name) return null;
+      if (!i?.wn_name) return null;
+      const slug = publicSlug(i);
       const t = tuition.get(id) ?? { min: null, max: null };
       return {
         name: i.wn_name,
@@ -232,8 +230,8 @@ export async function listInstitutions(f: ListFilters = {}) {
         card: {
           id: i.wn_institutionid,
           name: i.wn_name,
-          slug: i.wn_slug,
-          shortDescription: i.wn_shortdescription,
+          slug,
+          shortDescription: plainTeaser(i.wn_shortdescription, 160),
           logoUrl: i.wn_logourl,
           coverImageUrl: i.wn_coverimageurl,
           city: i.wn_city,

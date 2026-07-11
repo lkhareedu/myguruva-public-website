@@ -1,5 +1,6 @@
 import { prisma } from "../prisma.js";
-import { ACTIVE, PUBLISHED, RANK_ENGINEERING } from "../lib/gates.js";
+import { env } from "../env.js";
+import { ACTIVE, PUBLISHED, RANK_ENGINEERING, publicSlug } from "../lib/gates.js";
 import { dec, requireOpt } from "../lib/option-sets.js";
 import { overallRanks, tuitionByInstitution, verifiedIds } from "./list.js";
 
@@ -10,14 +11,23 @@ export async function compareInstitutions(slugs: string[]) {
   const verified = await verifiedIds();
   const institutions = await prisma.institution.findMany({
     where: {
-      wn_slug: { in: unique },
-      wn_publishstatus: PUBLISHED,
-      wn_currentstatus: ACTIVE,
+      OR: [{ wn_slug: { in: unique } }, { wn_institutionid: { in: unique } }],
+      ...(env.relaxPublicGates
+        ? {}
+        : { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE }),
     },
   });
+
   const ordered = unique
-    .map((s) => institutions.find((i) => i.wn_slug === s))
-    .filter((i): i is NonNullable<typeof i> => !!i && verified.has(i.wn_institutionid));
+    .map(
+      (s) =>
+        institutions.find((i) => i.wn_slug === s || i.wn_institutionid === s) ?? null,
+    )
+    .filter((i): i is NonNullable<typeof i> => {
+      if (!i) return false;
+      if (env.relaxPublicGates) return true;
+      return verified.has(i.wn_institutionid);
+    });
 
   const ids = ordered.map((i) => i.wn_institutionid);
   if (!ids.length) return { items: [] };
@@ -64,7 +74,7 @@ export async function compareInstitutions(slugs: string[]) {
       return {
         id,
         name: i.wn_name!,
-        slug: i.wn_slug!,
+        slug: publicSlug(i),
         logoUrl: i.wn_logourl,
         city: i.wn_city,
         state: i.wn_state,
@@ -85,7 +95,7 @@ export async function compareInstitutions(slugs: string[]) {
           : null,
         campusSizeAcres: dec(i.wn_campussizeacres),
         hasWifi: i.wn_haswifi,
-        verified: true,
+        verified: verified.has(id),
       };
     }),
   };

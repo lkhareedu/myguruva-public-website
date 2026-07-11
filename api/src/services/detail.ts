@@ -1,24 +1,37 @@
 import { prisma } from "../prisma.js";
-import { ACTIVE, FEE_TOTAL, FEE_TUITION, PUBLISHED, RANK_ENGINEERING } from "../lib/gates.js";
+import { env } from "../env.js";
+import { ACTIVE, FEE_TOTAL, FEE_TUITION, PUBLISHED, RANK_ENGINEERING, publicSlug } from "../lib/gates.js";
 import { dec, iso, requireOpt } from "../lib/option-sets.js";
 import { overallRanks, tuitionByInstitution, verifiedIds } from "./list.js";
 
 export async function getInstitutionBySlug(slug: string) {
-  const publicWhere = { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE };
+  const gated = !env.relaxPublicGates;
+  const publicWhere = gated
+    ? { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE }
+    : {};
 
   const bySlug = await prisma.institution.findFirst({
     where: { ...publicWhere, wn_slug: slug },
   });
 
   if (!bySlug) {
+    // TEMP / fallback: treat path segment as institution UUID when slug is missing in CRM
+    const byId = await prisma.institution.findFirst({
+      where: { ...publicWhere, wn_institutionid: slug },
+    });
+    if (byId) {
+      return { kind: "detail" as const, data: await buildDetail(byId) };
+    }
+
     const alias = await prisma.institutionAlias.findFirst({ where: { wn_slug: slug } });
     if (!alias?.wn_institution) return { kind: "notFound" as const };
     const parent = await prisma.institution.findFirst({
       where: { ...publicWhere, wn_institutionid: alias.wn_institution },
     });
-    if (!parent?.wn_slug) return { kind: "notFound" as const };
+    if (!parent) return { kind: "notFound" as const };
+    const primary = publicSlug(parent);
     if (alias.wn_redirecttomain) {
-      return { kind: "redirect" as const, primarySlug: parent.wn_slug };
+      return { kind: "redirect" as const, primarySlug: primary };
     }
     return { kind: "detail" as const, data: await buildDetail(parent) };
   }
@@ -151,7 +164,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
   return {
     id: i.wn_institutionid,
     name: i.wn_name!,
-    slug: i.wn_slug!,
+    slug: publicSlug(i),
     shortDescription: i.wn_shortdescription,
     logoUrl: i.wn_logourl,
     coverImageUrl: i.wn_coverimageurl,

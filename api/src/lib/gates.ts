@@ -11,3 +11,11 @@ export const publicInstitutionWhere = {
   wn_publishstatus: PUBLISHED,
   wn_currentstatus: ACTIVE,
 } as const;
+
+/** Prefer CRM slug; fall back to institution UUID so draft rows without slug still link. */
+export function publicSlug(row: {
+  wn_slug: string | null | undefined;
+  wn_institutionid: string;
+}): string {
+  return (row.wn_slug && row.wn_slug.trim()) || row.wn_institutionid;
+}

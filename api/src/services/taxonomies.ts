@@ -1,9 +1,11 @@
 import { prisma } from "../prisma.js";
+import { env } from "../env.js";
+import { publicSlug } from "../lib/gates.js";
 import { requireOpt } from "../lib/option-sets.js";
 
 export async function listStreams() {
   const items = await prisma.stream.findMany({
-    where: { wn_isactive: true },
+    where: env.relaxPublicGates ? undefined : { wn_isactive: true },
     orderBy: [{ wn_displayorder: "asc" }, { wn_name: "asc" }],
   });
   return {
@@ -43,7 +45,7 @@ export async function listLocations(type?: string, parentId?: string) {
     where: {
       ...(type && typeMap[type] != null ? { wn_locationtype: typeMap[type] } : {}),
       ...(parentId ? { wn_parentlocation: parentId } : {}),
-      wn_isactive: true,
+      ...(env.relaxPublicGates ? {} : { wn_isactive: true }),
     },
     orderBy: [{ wn_displayorder: "asc" }, { wn_name: "asc" }],
   });
@@ -91,17 +93,21 @@ export async function listRankingBodies() {
 
 export async function sitemapInstitutions() {
   const items = await prisma.institution.findMany({
-    where: {
-      wn_publishstatus: 777770002,
-      wn_currentstatus: 777770000,
-      wn_slug: { not: null },
-    },
-    select: { wn_slug: true, updated_at: true },
+    where: env.relaxPublicGates
+      ? { wn_name: { not: null } }
+      : {
+          wn_publishstatus: 777770002,
+          wn_currentstatus: 777770000,
+          wn_slug: { not: null },
+        },
+    select: { wn_institutionid: true, wn_slug: true, updated_at: true },
     orderBy: { updated_at: "desc" },
+    take: env.relaxPublicGates ? 5000 : undefined,
   });
   return {
-    items: items
-      .filter((i) => i.wn_slug)
-      .map((i) => ({ slug: i.wn_slug!, updatedAt: i.updated_at.toISOString() })),
+    items: items.map((i) => ({
+      slug: publicSlug(i),
+      updatedAt: i.updated_at.toISOString(),
+    })),
   };
 }

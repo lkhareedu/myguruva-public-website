@@ -39,8 +39,8 @@ function parseFilters(sp: URLSearchParams): ListFilters {
     verified: bool("verified"),
     featured: bool("featured"),
     page: num("page") ?? 1,
-    pageSize: 12,
-    sort: (sort as ListFilters["sort"]) || "relevance",
+    pageSize: 24,
+    sort: (sort as ListFilters["sort"]) || "name",
   };
 }
 
@@ -49,7 +49,7 @@ function filtersToParams(f: ListFilters): string {
   for (const [k, v] of Object.entries(f)) {
     if (v === undefined || v === null || v === "" || k === "pageSize") continue;
     if (k === "page" && v === 1) continue;
-    if (k === "sort" && v === "relevance") continue;
+    if (k === "sort" && v === "name") continue;
     q.set(k, String(v));
   }
   const s = q.toString();
@@ -137,19 +137,21 @@ function CollegesDirectoryInner() {
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-muted-foreground">
-              {data ? `Page ${data.page} of ${totalPages}` : "Loading…"}
+              {data
+                ? `Showing ${(data.page - 1) * data.pageSize + 1}–${Math.min(data.page * data.pageSize, data.total)} of ${data.total.toLocaleString()}`
+                : "Loading…"}
             </div>
             <label className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Sort</span>
               <select
-                value={filters.sort ?? "relevance"}
+                value={filters.sort ?? "name"}
                 onChange={(e) => setParam({ sort: e.target.value })}
                 className="rounded-md border border-border bg-card px-2 py-1"
               >
-                <option value="relevance">Relevance</option>
+                <option value="name">Name</option>
+                <option value="relevance">Featured</option>
                 <option value="rank">Rank</option>
                 <option value="fees">Fees</option>
-                <option value="name">Name</option>
               </select>
             </label>
           </div>
@@ -264,47 +266,55 @@ function Pagination({
 }) {
   const items = pageWindow(page, totalPages);
   return (
-    <nav aria-label="Pagination" className="mt-8 flex flex-wrap items-center justify-center gap-2">
-      <Link
-        href={hrefForPage(Math.max(1, page - 1))}
-        aria-disabled={page <= 1}
-        className={
-          "rounded-md border border-border px-3 py-1.5 text-sm " +
-          (page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-muted")
-        }
-      >
-        Previous
-      </Link>
-      {items.map((item, idx) =>
-        item === "…" ? (
-          <span key={`e-${idx}`} className="px-1 text-sm text-muted-foreground">
-            …
-          </span>
-        ) : (
-          <Link
-            key={item}
-            href={hrefForPage(item)}
-            className={
-              "min-w-9 rounded-md border px-3 py-1.5 text-center text-sm " +
-              (item === page
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border hover:bg-muted")
-            }
-          >
-            {item}
-          </Link>
-        ),
-      )}
-      <Link
-        href={hrefForPage(Math.min(totalPages, page + 1))}
-        aria-disabled={page >= totalPages}
-        className={
-          "rounded-md border border-border px-3 py-1.5 text-sm " +
-          (page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-muted")
-        }
-      >
-        Next
-      </Link>
+    <nav
+      aria-label="Pagination"
+      className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-between"
+    >
+      <div className="text-sm text-muted-foreground">
+        Page {page.toLocaleString()} of {totalPages.toLocaleString()}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <Link
+          href={hrefForPage(Math.max(1, page - 1))}
+          aria-disabled={page <= 1}
+          className={
+            "rounded-md border border-border px-3 py-1.5 text-sm " +
+            (page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-muted")
+          }
+        >
+          Previous
+        </Link>
+        {items.map((item, idx) =>
+          item === "…" ? (
+            <span key={`e-${idx}`} className="px-1 text-sm text-muted-foreground">
+              …
+            </span>
+          ) : (
+            <Link
+              key={item}
+              href={hrefForPage(item)}
+              className={
+                "min-w-9 rounded-md border px-2.5 py-1.5 text-center text-sm " +
+                (item === page
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:bg-muted")
+              }
+            >
+              {item}
+            </Link>
+          ),
+        )}
+        <Link
+          href={hrefForPage(Math.min(totalPages, page + 1))}
+          aria-disabled={page >= totalPages}
+          className={
+            "rounded-md border border-border px-3 py-1.5 text-sm " +
+            (page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-muted")
+          }
+        >
+          Next
+        </Link>
+      </div>
     </nav>
   );
 }

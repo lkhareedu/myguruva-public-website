@@ -34,6 +34,7 @@ export type ListFilters = {
 };
 
 type IdRow = { id: string };
+type CountRow = { c: number };
 
 export async function verifiedIds(): Promise<Set<string>> {
   const rows = await prisma.institutionReview.findMany({
@@ -95,7 +96,10 @@ export async function overallRanks(ids: string[]): Promise<Map<string, number | 
   return map;
 }
 
-async function resolveListIds(f: ListFilters): Promise<string[]> {
+async function buildListWhere(f: ListFilters): Promise<{
+  conditions: string[];
+  params: unknown[];
+}> {
   const conditions: string[] = ["i.wn_name IS NOT NULL"];
   if (!env.relaxPublicGates) {
     conditions.push(`i.wn_publishstatus = ${PUBLISHED}`);
@@ -142,7 +146,6 @@ async function resolveListIds(f: ListFilters): Promise<string[]> {
     p++;
   }
   if (f.featured) conditions.push(`i.wn_isfeatured = true`);
-  // Optional filter still works in relax mode; only the default Published/Active/slug gate is skipped.
   if (f.verified) {
     conditions.push(`EXISTS (
       SELECT 1 FROM institution_review r
@@ -196,16 +199,68 @@ async function resolveListIds(f: ListFilters): Promise<string[]> {
     )`);
   }
 
-  const sql = `SELECT i.wn_institutionid AS id FROM institutions i WHERE ${conditions.join(" AND ")}`;
-  const rows = await prisma.$queryRawUnsafe<IdRow[]>(sql, ...params);
-  return rows.map((r) => r.id);
+  return { conditions, params };
+}
+
+function orderBySql(sort: ListFilters["sort"]): string {
+  switch (sort) {
+    case "name":
+      return `i.wn_name ASC NULLS LAST`;
+    case "rank":
+      return `(
+        SELECT rk.wn_rank FROM ranking rk
+        WHERE rk.wn_institution = i.wn_institutionid AND rk.wn_category = ${RANK_OVERALL}
+        ORDER BY rk.updated_at DESC NULLS LAST
+        LIMIT 1
+      ) ASC NULLS LAST, i.wn_name ASC`;
+    case "fees":
+      return `(
+        SELECT coalesce(fs.wn_amountmin, fs.wn_amountmax) FROM fee_structure fs
+        WHERE fs.wn_institution = i.wn_institutionid
+          AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})
+        ORDER BY CASE WHEN fs.wn_feecategory = ${FEE_TUITION} THEN 0 ELSE 1 END,
+                 coalesce(fs.wn_amountmin, fs.wn_amountmax) ASC NULLS LAST
+        LIMIT 1
+      ) ASC NULLS LAST, i.wn_name ASC`;
+    case "relevance":
+    default:
+      return `i.wn_isfeatured DESC NULLS LAST, i.wn_name ASC`;
+  }
 }
 
 export async function listInstitutions(f: ListFilters = {}) {
   const page = Math.max(1, f.page ?? 1);
-  const pageSize = Math.min(50, Math.max(1, f.pageSize ?? 20));
-  const ids = await resolveListIds(f);
-  if (!ids.length) return { items: [], page, pageSize, total: 0 };
+  const pageSize = Math.min(48, Math.max(1, f.pageSize ?? 24));
+  const sort = f.sort ?? "relevance";
+
+  const { conditions, params } = await buildListWhere(f);
+  const whereSql = conditions.join(" AND ");
+
+  const countRows = await prisma.$queryRawUnsafe<CountRow[]>(
+    `SELECT COUNT(*)::int AS c FROM institutions i WHERE ${whereSql}`,
+    ...params,
+  );
+  const total = countRows[0]?.c ?? 0;
+  if (!total) return { items: [], page, pageSize, total: 0 };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * pageSize;
+
+  const limitParam = params.length + 1;
+  const offsetParam = params.length + 2;
+  const idRows = await prisma.$queryRawUnsafe<IdRow[]>(
+    `SELECT i.wn_institutionid AS id
+     FROM institutions i
+     WHERE ${whereSql}
+     ORDER BY ${orderBySql(sort)}
+     LIMIT $${limitParam} OFFSET $${offsetParam}`,
+    ...params,
+    pageSize,
+    offset,
+  );
+  const ids = idRows.map((r) => r.id);
+  if (!ids.length) return { items: [], page: safePage, pageSize, total };
 
   const [verified, tuition, ranks, institutions] = await Promise.all([
     verifiedIds(),
@@ -215,56 +270,32 @@ export async function listInstitutions(f: ListFilters = {}) {
   ]);
   const byId = new Map(institutions.map((i) => [i.wn_institutionid, i]));
 
-  const rows = ids
+  const items = ids
     .map((id) => {
       const i = byId.get(id);
       if (!i?.wn_name) return null;
-      const slug = publicSlug(i);
       const t = tuition.get(id) ?? { min: null, max: null };
       return {
+        id: i.wn_institutionid,
         name: i.wn_name,
+        slug: publicSlug(i),
+        shortDescription: plainTeaser(i.wn_shortdescription, 160),
+        logoUrl: i.wn_logourl,
+        coverImageUrl: i.wn_coverimageurl,
+        city: i.wn_city,
+        state: i.wn_state,
+        institutionType: requireOpt("institutionType", i.wn_institutiontype),
+        ownership: requireOpt("ownership", i.wn_ownership),
+        naacGrade: requireOpt("naacGrade", i.wn_naacgrade),
+        establishedYear: i.wn_establishedyear,
         isFeatured: !!i.wn_isfeatured,
         verified: verified.has(id),
         tuitionMin: t.min,
+        tuitionMax: t.max,
         latestOverallRank: ranks.get(id) ?? null,
-        card: {
-          id: i.wn_institutionid,
-          name: i.wn_name,
-          slug,
-          shortDescription: plainTeaser(i.wn_shortdescription, 160),
-          logoUrl: i.wn_logourl,
-          coverImageUrl: i.wn_coverimageurl,
-          city: i.wn_city,
-          state: i.wn_state,
-          institutionType: requireOpt("institutionType", i.wn_institutiontype),
-          ownership: requireOpt("ownership", i.wn_ownership),
-          naacGrade: requireOpt("naacGrade", i.wn_naacgrade),
-          establishedYear: i.wn_establishedyear,
-          isFeatured: !!i.wn_isfeatured,
-          verified: verified.has(id),
-          tuitionMin: t.min,
-          tuitionMax: t.max,
-          latestOverallRank: ranks.get(id) ?? null,
-        },
       };
     })
     .filter((r): r is NonNullable<typeof r> => !!r);
 
-  const sort = f.sort ?? "relevance";
-  rows.sort((a, b) => {
-    if (sort === "name") return a.name.localeCompare(b.name);
-    if (sort === "rank") return (a.latestOverallRank ?? 9999) - (b.latestOverallRank ?? 9999);
-    if (sort === "fees") {
-      return (a.tuitionMin ?? Number.POSITIVE_INFINITY) - (b.tuitionMin ?? Number.POSITIVE_INFINITY);
-    }
-    const featDiff = Number(b.isFeatured) - Number(a.isFeatured);
-    if (featDiff) return featDiff;
-    const verDiff = Number(b.verified) - Number(a.verified);
-    if (verDiff) return verDiff;
-    return (a.latestOverallRank ?? 9999) - (b.latestOverallRank ?? 9999);
-  });
-
-  const total = rows.length;
-  const start = (page - 1) * pageSize;
-  return { items: rows.slice(start, start + pageSize).map((r) => r.card), page, pageSize, total };
+  return { items, page: safePage, pageSize, total };
 }

@@ -200,7 +200,7 @@ function SearchToAdd({
   const { data: fullList } = useQuery({
     queryKey: ["compare-full", debounced],
     queryFn: () =>
-      fetchInstitutions({ q: debounced, verified: true, pageSize: 8, sort: "relevance" }),
+      fetchInstitutions({ q: debounced, pageSize: 8, sort: "relevance" }),
     enabled: debounced.length >= 2,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -234,7 +234,7 @@ function SearchToAdd({
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder="Search Verified colleges by name or city…"
+            placeholder="Search colleges by name or city…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             aria-label="Search colleges to add"
             autoComplete="off"
@@ -263,13 +263,13 @@ function SearchToAdd({
               </div>
             ) : combined.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">
-                No Verified colleges match &quot;{debounced}&quot;.
+                No colleges match &quot;{debounced}&quot;.
               </div>
             ) : (
               <ul className="divide-y divide-border">
                 {combined.map((c) => {
                   const inList = alreadyIn(c.slug);
-                  const canAdd = c.verified && !inList && !disabled;
+                  const canAdd = !inList && !disabled;
                   return (
                     <li key={c.slug} className="flex items-center justify-between gap-3 px-3 py-2">
                       <div className="min-w-0">
@@ -294,7 +294,7 @@ function SearchToAdd({
                               : "border-border text-muted-foreground opacity-60")
                         }
                       >
-                        {inList ? "Added" : !c.verified ? "Not Verified" : disabled ? "Full" : "+ Add"}
+                        {inList ? "Added" : disabled ? "Full" : "+ Add"}
                       </button>
                     </li>
                   );
@@ -310,7 +310,7 @@ function SearchToAdd({
         </div>
       ) : (
         <div className="mt-2 text-xs text-muted-foreground">
-          Type at least 2 characters. Only Verified colleges can be compared.
+          Type at least 2 characters to find colleges.
         </div>
       )}
     </div>

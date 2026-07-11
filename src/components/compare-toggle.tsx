@@ -11,12 +11,19 @@ type Props = {
   className?: string;
 };
 
+/**
+ * TEMP: allow compare for unverified colleges while public gates are relaxed.
+ * Re-enable verified-only by setting requireVerified back to true.
+ */
+const REQUIRE_VERIFIED_FOR_COMPARE = false;
+
 export function CompareToggle({ item, verified, variant = "button", className }: Props) {
   const { has, toggle, isFull, hydrated } = useCompare();
   const active = hydrated && has(item.slug);
-  const disabled = !verified || (!active && isFull);
+  const blockedByVerified = REQUIRE_VERIFIED_FOR_COMPARE && !verified;
+  const disabled = blockedByVerified || (!active && isFull);
 
-  const title = !verified
+  const title = blockedByVerified
     ? "Only Verified colleges can be compared"
     : disabled
     ? `Compare list is full (${COMPARE_MAX} max)`
@@ -27,7 +34,8 @@ export function CompareToggle({ item, verified, variant = "button", className }:
   const onClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!verified) return;
+    if (disabled && !active) return;
+    if (blockedByVerified) return;
     toggle(item);
   };
 

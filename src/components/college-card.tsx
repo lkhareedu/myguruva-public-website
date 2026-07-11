@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { InstitutionCard } from "@/lib/mock-data";
+import { teaser } from "@/lib/text";
 import { CompareToggle } from "./compare-toggle";
 
 function formatFees(min: number | null, max: number | null) {
@@ -32,9 +33,11 @@ export function VerifiedBadge() {
 }
 
 export function CollegeCard({ i }: { i: InstitutionCard }) {
+  const blurb = teaser(i.shortDescription, 108);
+
   return (
     <article className="flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary/35">
-      <div className="flex items-start gap-2.5 border-b border-border/60 px-3.5 pt-3.5 pb-2.5">
+      <div className="flex min-w-0 items-start gap-2.5 border-b border-border/60 px-3.5 pt-3.5 pb-2.5">
         <div
           aria-hidden
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold tracking-wide text-primary"
@@ -46,10 +49,10 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
             initials(i.name)
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <Link href={`/colleges/${i.slug}`} className="min-w-0 group">
-              <h3 className="line-clamp-2 font-display text-[0.95rem] leading-snug text-foreground group-hover:text-primary">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <Link href={`/colleges/${i.slug}`} className="min-w-0 flex-1 group">
+              <h3 className="line-clamp-2 break-words font-display text-[0.95rem] leading-snug text-foreground group-hover:text-primary">
                 {i.name}
               </h3>
             </Link>
@@ -57,11 +60,11 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
               item={{ slug: i.slug, name: i.name, city: i.city, state: i.state }}
               verified={i.verified}
               variant="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 shrink-0"
             />
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="truncate">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="min-w-0 truncate">
               {[i.city, i.state].filter(Boolean).join(", ")}
               {i.establishedYear ? ` · ${i.establishedYear}` : ""}
             </span>
@@ -70,25 +73,30 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
         </div>
       </div>
 
-      <Link href={`/colleges/${i.slug}`} className="flex min-w-0 flex-1 flex-col px-3.5 pt-2.5 pb-3.5">
-        {i.shortDescription ? (
-          <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
-            {i.shortDescription}
+      <Link
+        href={`/colleges/${i.slug}`}
+        className="flex min-w-0 flex-1 flex-col overflow-hidden px-3.5 pt-2.5 pb-3.5"
+      >
+        {blurb ? (
+          <p className="line-clamp-2 min-w-0 overflow-hidden break-words text-[13px] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+            {blurb}
           </p>
         ) : (
           <div className="flex-1" />
         )}
 
-        <div className="mt-auto flex flex-wrap gap-1 pt-2.5">
-          <span className="chip">{i.institutionType.label}</span>
+        <div className="mt-auto flex min-w-0 flex-wrap gap-1 pt-2.5">
+          <span className="chip max-w-full truncate">{i.institutionType.label}</span>
           <span className="chip">{i.ownership.label}</span>
           {i.naacGrade?.label && i.naacGrade.label !== "—" ? (
             <span className="chip">NAAC {i.naacGrade.label}</span>
           ) : null}
         </div>
 
-        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
-          <span className="truncate font-medium text-foreground/80">{formatFees(i.tuitionMin, i.tuitionMax)}</span>
+        <div className="mt-2.5 flex min-w-0 items-center justify-between gap-2 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
+          <span className="min-w-0 truncate font-medium text-foreground/80">
+            {formatFees(i.tuitionMin, i.tuitionMax)}
+          </span>
           <span className="shrink-0">
             {i.latestOverallRank != null ? `NIRF #${i.latestOverallRank}` : "Rank —"}
           </span>

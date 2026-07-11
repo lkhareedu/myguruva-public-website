@@ -1,0 +1,1135 @@
+// MyGuruVa CRM — PostgreSQL schema (wn_* fields align with the app entity model)
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  // Azure App Service Linux runs Debian 11 (OpenSSL 3.x). Without this,
+  // Prisma's query engine binary is missing on the container and the
+  // server hangs at first DB query → "Container did not start in 230s".
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+// ─── CRM Authentication ────────────────────────────────────────────────────
+
+model CrmUser {
+  id         String   @id @default(uuid()) @db.Uuid
+  email      String   @unique @db.VarChar(400)
+  name       String?  @db.VarChar(400)
+  password   String   @db.VarChar(200)
+  role       String   @default("admin") @db.VarChar(100)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("crm_user")
+}
+
+// ─── Contact (system entity) ─────────────────────────────────────────────
+
+model Contact {
+  contactid     String   @id @default(uuid()) @db.Uuid
+  fullname      String?  @db.VarChar(800)
+  firstname     String?  @db.VarChar(400)
+  lastname      String?  @db.VarChar(400)
+  emailaddress1 String?  @db.VarChar(400)
+  jobtitle      String?  @db.VarChar(400)
+  // Comma-separated app role ids synced from CrmUser.role (for lookups / reporting).
+  app_roles     String?  @db.VarChar(400)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("contact")
+}
+
+// ─── Location ─────────────────────────────────────────────────────────────
+
+model Location {
+  wn_locationid     String   @id @default(uuid()) @db.Uuid
+  wn_name           String?  @db.VarChar(1700)
+  wn_locationtype   Int?
+  wn_parentlocation String?  @db.Uuid
+  wn_isocode        String?  @db.VarChar(200)
+  wn_slug           String?  @db.VarChar(400)
+  wn_latitude       Decimal? @db.Decimal(10, 7)
+  wn_longitude      Decimal? @db.Decimal(10, 7)
+  wn_displayorder   Int?
+  wn_isactive       Boolean?
+  wn_ismetro        Boolean?
+  wn_istier1        Boolean?
+  wn_pincode        String?  @db.VarChar(200)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("location")
+}
+
+// ─── Stream ───────────────────────────────────────────────────────────────
+
+model Stream {
+  wn_streamid        String   @id @default(uuid()) @db.Uuid
+  wn_name            String?  @db.VarChar(1700)
+  wn_shortname       String?  @db.VarChar(200)
+  wn_slug            String?  @db.VarChar(600)
+  wn_description     String?
+  wn_iconurl         String?  @db.VarChar(2000)
+  wn_metadescription String?  @db.VarChar(1000)
+  wn_metatitle       String?  @db.VarChar(400)
+  wn_parentstream    String?  @db.Uuid
+  wn_isactive        Boolean?
+  wn_displayorder    Int?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("streams")
+}
+
+// ─── RankingBody ──────────────────────────────────────────────────────────
+
+model RankingBody {
+  wn_rankingbodyid   String   @id @default(uuid()) @db.Uuid
+  wn_name            String?  @db.VarChar(1700)
+  wn_shortname       String?  @db.VarChar(200)
+  wn_slug            String?  @db.VarChar(400)
+  wn_description     String?
+  wn_rankingscope    Int?
+  wn_website         String?  @db.VarChar(2000)
+  wn_methodologyurl  String?  @db.VarChar(2000)
+  wn_country         String?  @db.Uuid
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("ranking_body")
+}
+
+// ─── RegulatoryBody ───────────────────────────────────────────────────────
+
+model RegulatoryBody {
+  wn_regulatorybodyid  String   @id @default(uuid()) @db.Uuid
+  wn_name              String?  @db.VarChar(1700)
+  wn_shortname         String?  @db.VarChar(200)
+  wn_slug              String?  @db.VarChar(400)
+  wn_description       String?
+  wn_bodytype          Int?
+  wn_jurisdiction      Int?
+  wn_website           String?  @db.VarChar(2000)
+  wn_establishedyear   Int?
+  wn_country           String?  @db.Uuid
+  wn_applicablestreams Int[]
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("regulatory_body")
+}
+
+// ─── Company ──────────────────────────────────────────────────────────────
+
+model Company {
+  wn_companyid       String   @id @default(uuid()) @db.Uuid
+  wn_name            String?  @db.VarChar(1700)
+  wn_slug            String?  @db.VarChar(600)
+  wn_description     String?
+  wn_website         String?  @db.VarChar(1000)
+  wn_logourl         String?  @db.VarChar(1000)
+  wn_companysize     Int?
+  wn_industry        Int?
+  wn_headquarters    String?  @db.VarChar(400)
+  wn_glassdoorrating Decimal? @db.Decimal(3, 1)
+  wn_isactive        Boolean?
+  wn_publishstatus   Int?
+  wn_datasource      String?
+  wn_country         String?  @db.Uuid
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("company")
+}
+
+// ─── Scholarship ──────────────────────────────────────────────────────────
+
+model Scholarship {
+  wn_scholarshipid        String   @id @default(uuid()) @db.Uuid
+  wn_name                 String?  @db.VarChar(1700)
+  wn_slug                 String?  @db.VarChar(600)
+  wn_description          String?
+  wn_eligibility          String?
+  wn_amountmin            Decimal? @db.Decimal(15, 2)
+  wn_amountmax            Decimal? @db.Decimal(15, 2)
+  wn_amountdescription    String?  @db.VarChar(1000)
+  wn_applicationdeadline  String?  @db.VarChar(400)
+  wn_providername         String?  @db.VarChar(600)
+  wn_providertype         Int?
+  wn_websiteurl           String?  @db.VarChar(2000)
+  wn_metadescription      String?  @db.VarChar(1000)
+  wn_metatitle            String?  @db.VarChar(2000)
+  wn_datasource           String?
+  wn_applicablecategories Int[]
+  wn_applicablelevels     Int[]
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  @@map("scholarship")
+}
+
+// ─── AcademicYear ─────────────────────────────────────────────────────────
+
+model AcademicYear {
+  wn_academicyearid String    @id @default(uuid()) @db.Uuid
+  wn_name           String?   @db.VarChar(1700)
+  wn_termname       String?   @db.VarChar(200)
+  wn_yearstart      DateTime?
+  wn_yearend        DateTime?
+  wn_iscurrent      Boolean?
+  wn_status         Int?
+  wn_calendarsystem Int?
+  wn_calendaryear   Int?
+  wn_country        String?   @db.Uuid
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@map("academic_year")
+}
+
+// ─── Institution ──────────────────────────────────────────────────────────
+
+model Institution {
+  wn_institutionid        String   @id @default(uuid()) @db.Uuid
+  wn_name                 String?  @db.VarChar(1700)
+  wn_slug                 String?  @db.VarChar(200)
+  wn_description          String?
+  // AI Extract: human-readable warnings from resolution/create flow (plain text, multi-line).
+  wn_aiextractwarnings    String?
+  wn_shortdescription     String?  @db.VarChar(8000)
+  wn_metadescription      String?  @db.VarChar(1000)
+  wn_metatitle            String?  @db.VarChar(400)
+  wn_institutiontype      Int?
+  wn_ownership            Int?
+  wn_genderpolicy         Int?
+  wn_currentstatus        Int?
+  wn_publishstatus        Int?
+  wn_establishedyear      Int?
+  wn_aishecode            String?  @db.VarChar(200)
+  wn_addressline1         String?  @db.VarChar(600)
+  wn_addressline2         String?  @db.VarChar(600)
+  wn_addressline3         String?  @db.VarChar(600)
+  wn_city                 String?  @db.VarChar(200)
+  wn_district             String?  @db.VarChar(200)
+  wn_state                String?  @db.VarChar(200)
+  wn_pincode              String?  @db.VarChar(200)
+  wn_phone                String?  @db.VarChar(200)
+  wn_email                String?  @db.VarChar(400)
+  wn_admissionsemail      String?  @db.VarChar(400)
+  wn_website              String?  @db.VarChar(1000)
+  wn_logourl              String?  @db.VarChar(1000)
+  wn_coverimageurl        String?  @db.VarChar(1000)
+  wn_videotoururl         String?  @db.VarChar(1000)
+  wn_latitude             Decimal? @db.Decimal(10, 7)
+  wn_longitude            Decimal? @db.Decimal(10, 7)
+  wn_campussizeacres      Decimal? @db.Decimal(10, 2)
+  wn_internalrating       Decimal? @db.Decimal(3, 1)
+  wn_naacgrade            Int?
+  wn_naacvalidtill        DateTime?
+  wn_boardaffiliation     Int?
+  wn_educationlevels      Int?
+  wn_promotingbody        String?  @db.VarChar(600)
+  wn_minoritystatus       Int?
+  wn_parentrelationship   Int?
+  wn_datasource           String?
+  wn_ugcrecongnized       Boolean?
+  wn_aicteapproved        Boolean?
+  wn_isclaimed            Boolean?
+  wn_isfeatured           Boolean?
+  wn_hasplacementcell     Boolean?
+  wn_hasresearchcenter    Boolean?
+  wn_hasmedical           Boolean?
+  wn_haswifi              Boolean?
+  wn_hassports            Boolean?
+  wn_hastransport         Boolean?
+  wn_hasnssncc            Boolean?
+  wn_hasicc               Boolean?
+  wn_hasantiragging       Boolean?
+  wn_hasgrievancecell     Boolean?
+  wn_hascounselling       Boolean?
+  wn_hasincubation        Boolean?
+  wn_hasinternshipsupport Boolean?
+  wn_hasalumninetwork     Boolean?
+  // Lookups (stored as UUID, resolved by API layer)
+  wn_country              String?  @db.Uuid
+  wn_affiliateduniversity String?  @db.Uuid
+  wn_parentinstitution    String?  @db.Uuid
+  // Multiselects (stored as integer arrays)
+  wn_classesoffered       Int[]
+  wn_mediumofinstruction  Int[]
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  @@map("institutions")
+}
+
+// ─── School ───────────────────────────────────────────────────────────────
+
+model School {
+  wn_schoolid         String   @id @default(uuid()) @db.Uuid
+  wn_name             String?  @db.VarChar(1700)
+  wn_slug             String?  @db.VarChar(600)
+  wn_shortdescription String?  @db.VarChar(1000)
+  wn_description      String?
+  wn_datasource       String?
+  wn_dean             String?  @db.VarChar(400)
+  wn_principalname    String?  @db.VarChar(400)
+  wn_logourl          String?  @db.VarChar(1000)
+  wn_website          String?  @db.VarChar(1000)
+  wn_establishedyear  Int?
+  wn_totalfaculty     Int?
+  wn_totalstudents    Int?
+  wn_averagepackage   Decimal? @db.Decimal(15, 2)
+  wn_highestpackage   Decimal? @db.Decimal(15, 2)
+  wn_placementpct     Decimal? @db.Decimal(5, 2)
+  wn_academiccalendar Int?
+  wn_haslabs          Boolean?
+  wn_haslibrary       Boolean?
+  wn_hasplacementcell Boolean?
+  wn_hassports        Boolean?
+  wn_isdefault        Boolean?
+  // Lookups
+  wn_institution      String?  @db.Uuid
+  wn_primarystream    String?  @db.Uuid
+  wn_deancontact      String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean? @default(false)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@map("schools")
+}
+
+// ─── Department ───────────────────────────────────────────────────────────
+
+model Department {
+  wn_departmentid          String   @id @default(uuid()) @db.Uuid
+  wn_name                  String?  @db.VarChar(1700)
+  wn_description           String?
+  wn_datasource            String?
+  wn_hodname               String?  @db.VarChar(400)
+  wn_establishedyear       Int?
+  wn_facultycount          Int?
+  wn_labcount              Int?
+  wn_facilitiesdescription String?
+  wn_researchareas         String?
+  // Lookups
+  wn_institution           String?  @db.Uuid
+  wn_school                String?  @db.Uuid
+  wn_stream                String?  @db.Uuid
+  wn_hodcontact            String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated     Boolean? @default(false)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map("departments")
+}
+
+// ─── Course ───────────────────────────────────────────────────────────────
+
+model Course {
+  wn_courseid        String   @id @default(uuid()) @db.Uuid
+  wn_name            String?  @db.VarChar(1700)
+  wn_shortname       String?  @db.VarChar(200)
+  wn_slug            String?  @db.VarChar(600)
+  wn_description     String?
+  wn_careerprospects String?
+  wn_metadescription String?
+  wn_metatitle       String?  @db.VarChar(400)
+  wn_degreelevel     Int?
+  wn_isprofessional  Boolean?
+  // Lookups
+  wn_country         String?  @db.Uuid
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("courses")
+}
+
+// ─── Discipline ───────────────────────────────────────────────────────────
+
+model Discipline {
+  wn_disciplineid    String   @id @default(uuid()) @db.Uuid
+  wn_name            String?  @db.VarChar(1700)
+  wn_shortname       String?  @db.VarChar(200)
+  wn_slug            String?  @db.VarChar(400)
+  wn_description     String?
+  wn_metadescription String?
+  wn_metatitle       String?  @db.VarChar(400)
+  // Lookups
+  wn_course          String?  @db.Uuid
+  wn_stream          String?  @db.Uuid
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("disciplines")
+}
+
+// ─── EntranceExam ─────────────────────────────────────────────────────────
+
+model EntranceExam {
+  wn_entranceexamid     String   @id @default(uuid()) @db.Uuid
+  wn_name               String?  @db.VarChar(1700)
+  wn_shortname          String?  @db.VarChar(200)
+  wn_slug               String?  @db.VarChar(600)
+  wn_description        String?
+  wn_metadescription    String?
+  wn_metatitle          String?  @db.VarChar(1000)
+  wn_conductingbody     String?  @db.VarChar(600)
+  wn_counsellingbody    String?  @db.VarChar(1000)
+  wn_examlevel          Int?
+  wn_examtype           Int?
+  wn_frequency          Int?
+  wn_websiteurl         String?  @db.VarChar(2000)
+  wn_datasource         String?
+  wn_applicationstreams Int[]
+  // Lookups
+  wn_country            String?  @db.Uuid
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map("entrance_exam")
+}
+
+// ─── InstitutionCourse ────────────────────────────────────────────────────
+
+model InstitutionCourse {
+  wn_institutioncourseid String   @id @default(uuid()) @db.Uuid
+  wn_name                String?  @db.VarChar(1700)
+  wn_slug                String?  @db.VarChar(600)
+  wn_totalseats          Int?
+  wn_durationyears       Decimal? @db.Decimal(5, 2)
+  wn_durationtype        Int?
+  wn_educationmode       Int?
+  wn_academiccalendar    Int?
+  wn_applicationmode     Int?
+  wn_eligibilitycriteria String?
+  wn_syllabussummary     String?
+  wn_admissionprocess    String?
+  wn_datasource          String?
+  wn_accreditedbynba     Boolean?
+  wn_isactive            Boolean?
+  wn_nbavalidtill        DateTime?
+  // Lookups
+  wn_institution         String?  @db.Uuid
+  wn_course              String?  @db.Uuid
+  wn_discipline          String?  @db.Uuid
+  wn_school              String?  @db.Uuid
+  wn_department          String?  @db.Uuid
+  wn_stream              String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated   Boolean? @default(false)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  @@map("institution_courses")
+}
+
+// ─── Accreditation ────────────────────────────────────────────────────────
+
+model Accreditation {
+  wn_accreditationid       String    @id @default(uuid()) @db.Uuid
+  wn_name                  String?   @db.VarChar(1700)
+  wn_grade                 Int?
+  wn_cgpascore             Decimal?  @db.Decimal(4, 2)
+  wn_cyclenumber           String?   @db.VarChar(50)
+  wn_accreditationstatus   Int?
+  wn_accreditationyear     Int?
+  wn_accreditationremarks  String?   @db.VarChar(2000)
+  wn_accreditationdate     DateTime?
+  wn_validfrom         DateTime?
+  wn_validtill         DateTime?
+  wn_certificateurl    String?   @db.VarChar(2000)
+  wn_datasource        String?
+  // Lookups
+  wn_institution       String?   @db.Uuid
+  wn_school            String?   @db.Uuid
+  wn_department        String?   @db.Uuid
+  wn_regulatorybody    String?   @db.Uuid
+  wn_institutioncourse String?   @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean?  @default(false)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@map("accreditation")
+}
+
+// ─── AdmissionCycle ───────────────────────────────────────────────────────
+
+model AdmissionCycle {
+  wn_admissioncycleid   String    @id @default(uuid()) @db.Uuid
+  wn_name               String?   @db.VarChar(1700)
+  wn_admissionstatus    Int?
+  wn_applicationmode    Int?
+  wn_intaketerm         Int?
+  wn_applicationstart   DateTime?
+  wn_applicationend     DateTime?
+  wn_classesstartdate   DateTime?
+  wn_lastdatelatefee    DateTime?
+  wn_applicationfeegen  Decimal?  @db.Decimal(15, 2)
+  wn_applicationfeescst Decimal?  @db.Decimal(15, 2)
+  wn_counsellingbody    String?   @db.VarChar(600)
+  wn_selectionprocess   String?
+  wn_datasource         String?
+  // Lookups
+  wn_institution        String?   @db.Uuid
+  wn_institutioncourse  String?   @db.Uuid
+  wn_academicyear       String?   @db.Uuid
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  @@map("admission_cycle")
+}
+
+// ─── Affiliation ──────────────────────────────────────────────────────────
+
+model Affiliation {
+  wn_affiliationid     String    @id @default(uuid()) @db.Uuid
+  wn_name              String?   @db.VarChar(1700)
+  wn_affiliationnumber String?   @db.VarChar(200)
+  wn_affiliationtype   Int?
+  wn_iscurrent         Boolean?
+  wn_validfrom         DateTime?
+  wn_validtill         DateTime?
+  wn_datasource        String?
+  // Lookups
+  wn_institution       String?   @db.Uuid
+  wn_university        String?   @db.Uuid
+  wn_academicyear      String?   @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean?  @default(false)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@map("affiliation")
+}
+
+// ─── Approval ─────────────────────────────────────────────────────────────
+
+model Approval {
+  wn_approvalid     String    @id @default(uuid()) @db.Uuid
+  wn_name           String?   @db.VarChar(1700)
+  wn_approvalnumber String?   @db.VarChar(200)
+  wn_approvalstatus Int?
+  wn_approvaldate   DateTime?
+  wn_validfrom      DateTime?
+  wn_validtill      DateTime?
+  wn_documenturl    String?   @db.VarChar(2000)
+  wn_notes          String?
+  wn_datasource     String?
+  // Lookups
+  wn_institution    String?   @db.Uuid
+  wn_regulatorybody String?   @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean? @default(false)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@map("approval")
+}
+
+// ─── ChangeRequest ────────────────────────────────────────────────────────
+
+model ChangeRequest {
+  wn_changerequestid     String    @id @default(uuid()) @db.Uuid
+  wn_name                String?   @db.VarChar(500)
+  wn_targetentity        String?   @db.VarChar(100)
+  wn_targetentitydisplay String?   @db.VarChar(100)
+  wn_targetrecordid      String?   @db.VarChar(100)
+  wn_targetrecordname    String?   @db.VarChar(500)
+  wn_recordstatus        Int?
+  wn_changetype          Int?
+  wn_changespayload      String?
+  wn_originalsnapshot    String?
+  wn_fieldsdiffsummary   String?   @db.VarChar(500)
+  wn_fieldschangedcount  Int?      @default(0)
+  wn_priority            Int?
+  wn_reason              Int?
+  wn_requestercomment    String?
+  wn_changedon           DateTime?
+  wn_reviewstatus        Int?
+  wn_reviewedon          DateTime?
+  wn_reviewernotes       String?
+  wn_appliedon           DateTime?
+  wn_applyerrormessage   String?   @db.VarChar(1000)
+  wn_publishstatus       Int?
+  // Lookups
+  wn_institutionreview   String?   @db.Uuid
+  wn_institution         String?   @db.Uuid
+  wn_changedby           String?   @db.Uuid
+  wn_reviewedby          String?   @db.Uuid
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  @@map("change_request")
+}
+
+// ─── CourseAlias ──────────────────────────────────────────────────────────
+
+model CourseAlias {
+  wn_coursealiasid  String   @id @default(uuid()) @db.Uuid
+  wn_name           String?  @db.VarChar(1700)
+  wn_slug           String?  @db.VarChar(400)
+  wn_aliastype      Int?
+  wn_language       Int?
+  wn_redirecttomain Boolean?
+  // Lookups
+  wn_course         String?  @db.Uuid
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("course_alias")
+}
+
+// ─── CourseApproval ───────────────────────────────────────────────────────
+
+model CourseApproval {
+  wn_courseapprovalid  String    @id @default(uuid()) @db.Uuid
+  wn_name              String?   @db.VarChar(1700)
+  wn_approvalnumber    String?   @db.VarChar(200)
+  wn_approvalstatus    Int?
+  wn_approvedintake    Int?
+  wn_validfrom         DateTime?
+  wn_validtill         DateTime?
+  wn_documenturl       String?   @db.VarChar(1000)
+  wn_notes             String?
+  wn_datasource        String?
+  // Lookups
+  wn_institutioncourse String?   @db.Uuid
+  wn_regulatorybody    String?   @db.Uuid
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@map("course_approval")
+}
+
+// ─── CutoffDetail ─────────────────────────────────────────────────────────
+
+model CutoffDetail {
+  wn_cutoffdetailid    String   @id @default(uuid()) @db.Uuid
+  wn_name              String?  @db.VarChar(1700)
+  wn_category          Int?
+  wn_cutofftype        Int?
+  wn_openingcutoff     Decimal? @db.Decimal(10, 4)
+  wn_closingcutoff     Decimal? @db.Decimal(10, 4)
+  wn_gender            Int?
+  wn_quota             Int?
+  wn_round             Int?
+  wn_domicilestate     String?  @db.VarChar(200)
+  wn_datasource        String?
+  // Lookups
+  wn_institution       String?  @db.Uuid
+  wn_institutioncourse String?  @db.Uuid
+  wn_academicyear      String?  @db.Uuid
+  wn_entranceexam      String?  @db.Uuid
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("cutoff_detail")
+}
+
+// ─── ExamAccepted ─────────────────────────────────────────────────────────
+
+model ExamAccepted {
+  wn_examacceptedid     String   @id @default(uuid()) @db.Uuid
+  wn_name               String?  @db.VarChar(1700)
+  wn_isactive           Boolean?
+  wn_isprimaryexam      Boolean?
+  wn_minpercentage      Decimal? @db.Decimal(5, 2)
+  wn_weightagepercent   Decimal? @db.Decimal(5, 2)
+  wn_eligibilitycriteria String?
+  wn_admissionprocess   String?
+  wn_datasource         String?
+  // Lookups
+  wn_institution        String?  @db.Uuid
+  wn_institutioncourse  String?  @db.Uuid
+  wn_entranceexam       String?  @db.Uuid
+  wn_academicyear       String?  @db.Uuid
+  wn_school             String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated  Boolean? @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map("exam_accepted")
+}
+
+// ─── ExamAlias ────────────────────────────────────────────────────────────
+
+model ExamAlias {
+  wn_examaliasid    String   @id @default(uuid()) @db.Uuid
+  wn_name           String?  @db.VarChar(1700)
+  wn_slug           String?  @db.VarChar(400)
+  wn_aliastype      Int?
+  wn_redirecttomain Boolean?
+  // Lookups
+  wn_entranceexam   String?  @db.Uuid
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("exam_alias")
+}
+
+// ─── ExamSchedule ─────────────────────────────────────────────────────────
+
+model ExamSchedule {
+  wn_examscheduleid        String    @id @default(uuid()) @db.Uuid
+  wn_name                  String?   @db.VarChar(1700)
+  wn_session               Int?
+  wn_examdate              DateTime?
+  wn_examenddate           DateTime?
+  wn_registrationstartdate DateTime?
+  wn_registrationenddate   DateTime?
+  wn_admitcarddate         DateTime?
+  wn_answerkeydate         DateTime?
+  wn_resultdate            DateTime?
+  wn_counsellingstartdate  DateTime?
+  wn_durationminutes       Int?
+  wn_totalmarks            Int?
+  wn_totalquestions        Int?
+  wn_negativemarking       Boolean?
+  wn_negativepercent       Decimal?  @db.Decimal(5, 2)
+  wn_exammode              Int?
+  wn_minqualification      Int?
+  wn_minimumpercentage     Decimal?  @db.Decimal(5, 2)
+  wn_maxattempts           Int?
+  wn_agecriteria           String?
+  wn_eligibility           String?
+  wn_requiredsubjects      String?
+  wn_syllabussummary       String?
+  wn_exampattern           String?
+  wn_totalregistered       Int?
+  wn_totalappeared         Int?
+  wn_totalqualified        Int?
+  wn_applicationfee        Decimal?  @db.Decimal(15, 2)
+  wn_applicationfeescst    Decimal?  @db.Decimal(15, 2)
+  wn_datasource            String?
+  wn_eligibleboards        Int[]
+  // Lookups
+  wn_entranceexam          String?   @db.Uuid
+  wn_academicyear          String?   @db.Uuid
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @updatedAt
+
+  @@map("exam_schedule")
+}
+
+// ─── FacultySummary ───────────────────────────────────────────────────────
+
+model FacultySummary {
+  wn_facultysummaryid    String   @id @default(uuid()) @db.Uuid
+  wn_name                String?  @db.VarChar(1700)
+  wn_totalfaculty        Int?
+  wn_professors          Int?
+  wn_associateprofessors Int?
+  wn_assistantprofessors Int?
+  wn_visitingfaculty     Int?
+  wn_facultywithphd      Int?
+  wn_studentteacherratio String?  @db.VarChar(200)
+  wn_publicationscount   Int?
+  wn_patentscount        Int?
+  wn_datasource          String?
+  // Lookups
+  wn_institution         String?  @db.Uuid
+  wn_school              String?  @db.Uuid
+  wn_department          String?  @db.Uuid
+  wn_academicyear        String?  @db.Uuid
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  @@map("faculty_summary")
+}
+
+// ─── FeeStructure ─────────────────────────────────────────────────────────
+
+model FeeStructure {
+  wn_feestructureid      String   @id @default(uuid()) @db.Uuid
+  wn_name                String?  @db.VarChar(1700)
+  wn_feecategory         Int?
+  wn_seatquotacategory   Int?
+  wn_frequency           Int?
+  wn_amountmin         Decimal? @db.Decimal(15, 2)
+  wn_amountmax         Decimal? @db.Decimal(15, 2)
+  wn_studentcategory   Int?
+  wn_isrefundable      Boolean?
+  wn_notes             String?
+  wn_datasource        String?
+  // Lookups
+  wn_institution       String?  @db.Uuid
+  wn_institutioncourse String?  @db.Uuid
+  wn_academicyear      String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean? @default(false)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("fee_structure")
+}
+
+// ─── Gallery ──────────────────────────────────────────────────────────────
+
+model Gallery {
+  wn_galleryid    String   @id @default(uuid()) @db.Uuid
+  wn_name         String?  @db.VarChar(1700)
+  wn_mediaurl     String?  @db.VarChar(2000)
+  wn_thumbnailurl String?  @db.VarChar(2000)
+  wn_alttext      String?  @db.VarChar(200)
+  wn_category     Int?
+  wn_mediatype    Int?
+  wn_displayorder Int?
+  wn_isfeatured   Boolean?
+  wn_datasource   String?
+  // Lookups
+  wn_institution  String?  @db.Uuid
+  wn_school       String?  @db.Uuid
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("gallery")
+}
+
+// ─── Hostel ───────────────────────────────────────────────────────────────
+
+model Hostel {
+  wn_hostelid      String   @id @default(uuid()) @db.Uuid
+  wn_name          String?  @db.VarChar(1700)
+  wn_hosteltype    Int?
+  wn_totalrooms    Int?
+  wn_totalcapacity Int?
+  wn_annualfeemin  Decimal? @db.Decimal(15, 2)
+  wn_annualfeemax  Decimal? @db.Decimal(15, 2)
+  wn_messfeemin    Decimal? @db.Decimal(15, 2)
+  wn_messfeemax    Decimal? @db.Decimal(15, 2)
+  wn_description   String?
+  wn_hasac         Boolean?
+  wn_haswifi       Boolean?
+  wn_hasmess       Boolean?
+  wn_hasgym        Boolean?
+  wn_haslaundry    Boolean?
+  wn_datasource    String?
+  wn_roomtypes     Int[]
+  // Lookups
+  wn_institution   String?  @db.Uuid
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("hostel")
+}
+
+// ─── Infrastructure ───────────────────────────────────────────────────────
+
+model Infrastructure {
+  wn_infrastructureid    String   @id @default(uuid()) @db.Uuid
+  wn_name                String?  @db.VarChar(1700)
+  wn_facilitytype        Int?
+  wn_capacity            Int?
+  wn_areasqft            Decimal? @db.Decimal(10, 2)
+  wn_libraryvolumes      Int?
+  wn_libraryjournals     Int?
+  wn_description         String?
+  wn_equipmenthighlights String?
+  wn_imageurl            String?  @db.VarChar(2000)
+  wn_hasac               Boolean?
+  wn_hasprojector        Boolean?
+  wn_datasource          String?
+  // Lookups
+  wn_institution         String?  @db.Uuid
+  wn_school              String?  @db.Uuid
+  wn_department          String?  @db.Uuid
+  wn_institutioncourse   String?  @db.Uuid
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  @@map("infrastructure")
+}
+
+// ─── InstitutionAlias ─────────────────────────────────────────────────────
+
+model InstitutionAlias {
+  wn_institutionaliasid String   @id @default(uuid()) @db.Uuid
+  wn_name               String?  @db.VarChar(1700)
+  wn_slug               String?  @db.VarChar(600)
+  wn_aliastype          Int?
+  wn_isprimary          Boolean?
+  wn_redirecttomain     Boolean?
+  // Lookups
+  wn_institution        String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated  Boolean? @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map("institution_alias")
+}
+
+// ─── InstitutionCourseYearDetail ──────────────────────────────────────────
+
+model InstitutionCourseYearDetail {
+  wn_institutioncourseyeardetailid String    @id @default(uuid()) @db.Uuid
+  wn_name                          String?   @db.VarChar(1700)
+  wn_approvedintake                Int?
+  wn_actualadmitted                Int?
+  wn_lateralentryseats             Int?
+  wn_applicationstart              DateTime?
+  wn_applicationend                DateTime?
+  wn_classesstart                  DateTime?
+  wn_tuitionfeemin                 Decimal?  @db.Decimal(15, 2)
+  wn_tuitionfeemax                 Decimal?  @db.Decimal(15, 2)
+  wn_totalfeemin                   Decimal?  @db.Decimal(15, 2)
+  wn_totalfeemax                   Decimal?  @db.Decimal(15, 2)
+  wn_hostelfee                     Decimal?  @db.Decimal(15, 2)
+  wn_otherfees                     Decimal?  @db.Decimal(15, 2)
+  wn_feedescription                String?
+  wn_datasource                    String?
+  // Lookups
+  wn_institutioncourse             String?   @db.Uuid
+  wn_academicyear                  String?   @db.Uuid
+  created_at                       DateTime  @default(now())
+  updated_at                       DateTime  @updatedAt
+
+  @@map("institution_course_year_detail")
+}
+
+// ─── InstitutionReview ────────────────────────────────────────────────────
+
+model InstitutionReview {
+  wn_institutionreviewid  String    @id @default(uuid()) @db.Uuid
+  wn_name                 String?   @db.VarChar(300)
+  wn_reviewstatus         Int?
+  wn_startedon            DateTime?
+  wn_submittedon          DateTime?
+  wn_reviewedon           DateTime?
+  wn_completedon          DateTime?
+  wn_lastactivityon       DateTime?
+  wn_totalrecords         Int?      @default(0)
+  wn_verifiedcount        Int?      @default(0)
+  wn_changerequestedcount Int?      @default(0)
+  wn_skippedcount         Int?      @default(0)
+  wn_completionpercentage Decimal?  @db.Decimal(5, 2) @default(0)
+  wn_approvedchangescount Int?      @default(0)
+  wn_rejectedchangescount Int?      @default(0)
+  wn_reviewernotes        String?
+  wn_publishstatus        Int?
+  // Lookups
+  wn_institution          String?   @db.Uuid
+  wn_assignedto           String?   @db.Uuid
+  wn_submittedby          String?   @db.Uuid
+  wn_reviewedby           String?   @db.Uuid
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  @@map("institution_review")
+}
+
+// ─── InstitutionScholarship ───────────────────────────────────────────────
+
+model InstitutionScholarship {
+  wn_institutionscholarshipid String   @id @default(uuid()) @db.Uuid
+  wn_name                     String?  @db.VarChar(1700)
+  wn_recipientscount          Int?
+  wn_notes                    String?
+  wn_datasource               String?
+  // Lookups
+  wn_institution              String?  @db.Uuid
+  wn_scholarship              String?  @db.Uuid
+  wn_academicyear             String?  @db.Uuid
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+
+  @@map("institution_scholarship")
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────
+
+model Notification {
+  wn_notificationid       String    @id @default(uuid()) @db.Uuid
+  wn_title                String?   @db.VarChar(200)
+  wn_message              String?   @db.VarChar(2000)
+  wn_link                 String?   @db.VarChar(500)
+  wn_kind                 Int?
+  wn_isread               Int?      @default(0)
+  wn_readon               DateTime?
+  wn_priority             Int?
+  // Lookups
+  wn_recipient            String?   @db.Uuid
+  wn_sender               String?   @db.Uuid
+  wn_relatedreview        String?   @db.Uuid
+  wn_relatedchangerequest String?   @db.Uuid
+  wn_relatedinstitution   String?   @db.Uuid
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  @@map("notification")
+}
+
+// ─── PlacementDetail ──────────────────────────────────────────────────────
+
+model PlacementDetail {
+  wn_placementdetailid String   @id @default(uuid()) @db.Uuid
+  wn_name              String?  @db.VarChar(1700)
+  wn_roleoffered       String?  @db.VarChar(600)
+  wn_joblocation       String?  @db.VarChar(400)
+  wn_offersmade        Int?
+  wn_offertype         Int?
+  wn_sector            Int?
+  wn_ctcmin            Decimal? @db.Decimal(15, 2)
+  wn_ctcmax            Decimal? @db.Decimal(15, 2)
+  wn_datasource        String?
+  // Lookups
+  wn_institution       String?  @db.Uuid
+  wn_academicyear      String?  @db.Uuid
+  wn_placementsummary  String?  @db.Uuid
+  wn_recruiter         String?  @db.Uuid
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("placement_detail")
+}
+
+// ─── PlacementSummary ─────────────────────────────────────────────────────
+
+model PlacementSummary {
+  wn_placementsummaryid   String   @id @default(uuid()) @db.Uuid
+  wn_name                 String?  @db.VarChar(1700)
+  wn_totaleligible        Int?
+  wn_totalplaced          Int?
+  wn_totaloffers          Int?
+  wn_companiesregistered  Int?
+  wn_companiesvisited     Int?
+  wn_companiesoffered     Int?
+  wn_ppocount             Int?
+  wn_placementpct         Decimal? @db.Decimal(5, 2)
+  wn_higherstudiespct     Decimal? @db.Decimal(5, 2)
+  wn_internshippct        Decimal? @db.Decimal(5, 2)
+  wn_averagepackagemin    Decimal? @db.Decimal(15, 2)
+  wn_averagepackagemax    Decimal? @db.Decimal(15, 2)
+  wn_medianpackage        Decimal? @db.Decimal(15, 2)
+  wn_lowestpackage        Decimal? @db.Decimal(15, 2)
+  wn_highestdomestic      Decimal? @db.Decimal(15, 2)
+  wn_highestinternational Decimal? @db.Decimal(15, 2)
+  wn_sectorbreakdown      String?
+  wn_sourcetype           Int?
+  wn_datasource           String?
+  // Lookups
+  wn_institution          String?  @db.Uuid
+  wn_institutioncourse    String?  @db.Uuid
+  wn_school               String?  @db.Uuid
+  wn_academicyear         String?  @db.Uuid
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  @@map("placement_summary")
+}
+
+// ─── Ranking ──────────────────────────────────────────────────────────────
+
+model Ranking {
+  wn_rankingid      String   @id @default(uuid()) @db.Uuid
+  wn_name           String?  @db.VarChar(1700)
+  wn_rank           Int?
+  wn_rankband       String?  @db.VarChar(200)
+  wn_rankchange     Int?
+  wn_score          Decimal? @db.Decimal(10, 4)
+  wn_category       Int?
+  wn_parameterscores String?
+  wn_datasource     String?
+  // Lookups
+  wn_institution    String?  @db.Uuid
+  wn_rankingbody    String?  @db.Uuid
+  wn_academicyear   String?  @db.Uuid
+  // Review workflow
+  wn_isreviewercreated Boolean? @default(false)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("ranking")
+}
+
+// ─── Review ───────────────────────────────────────────────────────────────
+
+model Review {
+  wn_reviewid             String    @id @default(uuid()) @db.Uuid
+  wn_name                 String?   @db.VarChar(1700)
+  wn_reviewtitle          String?   @db.VarChar(600)
+  wn_reviewtext           String?
+  wn_pros                 String?
+  wn_cons                 String?
+  wn_reviewtype           Int?
+  wn_reviewdate           DateTime?
+  wn_batchyear            Int?
+  wn_overallrating        Decimal?  @db.Decimal(3, 1)
+  wn_academicsrating      Decimal?  @db.Decimal(3, 1)
+  wn_facultyrating        Decimal?  @db.Decimal(3, 1)
+  wn_infrastructurerating Decimal?  @db.Decimal(3, 1)
+  wn_campusliferating     Decimal?  @db.Decimal(3, 1)
+  wn_placementrating      Decimal?  @db.Decimal(3, 1)
+  wn_valueformoney        Decimal?  @db.Decimal(3, 1)
+  wn_helpfulcount         Int?
+  wn_isverified           Boolean?
+  wn_moderationstatus     Int?
+  wn_datasource           String?
+  // Lookups
+  wn_institution          String?   @db.Uuid
+  wn_institutioncourse    String?   @db.Uuid
+  wn_reviewer             String?   @db.Uuid
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  @@map("review")
+}
+
+// ─── StatusChange ─────────────────────────────────────────────────────────
+
+model StatusChange {
+  wn_statuschangeid String    @id @default(uuid()) @db.Uuid
+  wn_name           String?   @db.VarChar(1700)
+  wn_changetype     Int?
+  wn_previousvalue  String?   @db.VarChar(600)
+  wn_newvalue       String?   @db.VarChar(600)
+  wn_effectivedate  DateTime?
+  wn_authority      String?   @db.VarChar(600)
+  wn_notes          String?
+  wn_datasource     String?
+  // Lookups
+  wn_institution    String?   @db.Uuid
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@map("status_change")
+}
+
+// ─── StudentStats ─────────────────────────────────────────────────────────
+
+model StudentStats {
+  wn_studentstatsid   String   @id @default(uuid()) @db.Uuid
+  wn_name             String?  @db.VarChar(1700)
+  wn_totalstudents    Int?
+  wn_ugcount          Int?
+  wn_pgcount          Int?
+  wn_phdcount         Int?
+  wn_diplomacount     Int?
+  wn_malepercentage   Decimal? @db.Decimal(5, 2)
+  wn_femalepercentage Decimal? @db.Decimal(5, 2)
+  wn_othergenderpct   Decimal? @db.Decimal(5, 2)
+  wn_scstpct          Decimal? @db.Decimal(5, 2)
+  wn_obcpct           Decimal? @db.Decimal(5, 2)
+  wn_ewspct           Decimal? @db.Decimal(5, 2)
+  wn_outofstatepct    Decimal? @db.Decimal(5, 2)
+  wn_internationalpct Decimal? @db.Decimal(5, 2)
+  wn_datasouce        String?
+  // Lookups
+  wn_institution      String?  @db.Uuid
+  wn_school           String?  @db.Uuid
+  wn_academicyear     String?  @db.Uuid
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@map("student_stats")
+}

@@ -35,8 +35,19 @@ export function VerifiedBadge() {
 export function CollegeCard({ i }: { i: InstitutionCard }) {
   const blurb = teaser(i.shortDescription, 90);
 
+  const warmDetail = () => {
+    // Warm API/CDN cache so the detail page feels instant after click
+    void fetch(`/v1/institutions/${encodeURIComponent(i.slug)}`, {
+      headers: { Accept: "application/json" },
+    }).catch(() => undefined);
+  };
+
   return (
-    <article className="college-card transition hover:border-primary/35">
+    <article
+      className="college-card transition hover:border-primary/35"
+      onMouseEnter={warmDetail}
+      onFocus={warmDetail}
+    >
       <div className="flex min-w-0 items-start gap-2.5 px-3.5 pt-3.5 pb-2">
         <div
           aria-hidden

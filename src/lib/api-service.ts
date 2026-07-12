@@ -1,4 +1,5 @@
 import type { InstitutionCard, InstitutionDetail } from "./mock-data";
+import { cache } from "react";
 
 export type SuggestResult = {
   colleges: Array<{
@@ -103,7 +104,7 @@ export async function listInstitutions(f: ListFilters = {}) {
   }>(`/v1/institutions${toQuery(f)}`);
 }
 
-export async function getInstitutionBySlug(
+export const getInstitutionBySlug = cache(async function getInstitutionBySlug(
   slug: string,
 ): Promise<
   | { kind: "detail"; data: InstitutionDetail }
@@ -113,7 +114,8 @@ export async function getInstitutionBySlug(
   const base = apiBase();
   const res = await fetch(`${base}/v1/institutions/${encodeURIComponent(slug)}`, {
     headers: { Accept: "application/json" },
-    cache: "no-store",
+    // Short TTL so detail navigation feels instant after first hit
+    next: { revalidate: 60 },
     redirect: "manual",
   });
   if (res.status === 404) return { kind: "notFound" };
@@ -125,7 +127,7 @@ export async function getInstitutionBySlug(
   }
   if (!res.ok) throw new Error(`API institution failed: ${res.status}`);
   return { kind: "detail", data: (await res.json()) as InstitutionDetail };
-}
+});
 
 export async function compareInstitutions(slugs: string[]) {
   return apiGet<{ items: CompareRow[] }>(

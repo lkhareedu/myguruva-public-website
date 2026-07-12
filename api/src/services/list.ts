@@ -36,13 +36,36 @@ export type ListFilters = {
 type IdRow = { id: string };
 type CountRow = { c: number };
 
+let verifiedCache: { at: number; ids: Set<string> } | null = null;
+const VERIFIED_TTL_MS = 60_000;
+
 export async function verifiedIds(): Promise<Set<string>> {
+  if (verifiedCache && Date.now() - verifiedCache.at < VERIFIED_TTL_MS) {
+    return verifiedCache.ids;
+  }
   const rows = await prisma.institutionReview.findMany({
     where: { wn_reviewstatus: REVIEW_COMPLETED, wn_institution: { not: null } },
     select: { wn_institution: true },
     distinct: ["wn_institution"],
   });
-  return new Set(rows.map((r) => r.wn_institution!).filter(Boolean));
+  const ids = new Set(rows.map((r) => r.wn_institution!).filter(Boolean));
+  verifiedCache = { at: Date.now(), ids };
+  return ids;
+}
+
+/** Cheap single-institution verified check (avoids loading the full review set). */
+export async function isInstitutionVerified(institutionId: string): Promise<boolean> {
+  if (verifiedCache && Date.now() - verifiedCache.at < VERIFIED_TTL_MS) {
+    return verifiedCache.ids.has(institutionId);
+  }
+  const row = await prisma.institutionReview.findFirst({
+    where: {
+      wn_institution: institutionId,
+      wn_reviewstatus: REVIEW_COMPLETED,
+    },
+    select: { wn_institutionreviewid: true },
+  });
+  return !!row;
 }
 
 export async function tuitionByInstitution(

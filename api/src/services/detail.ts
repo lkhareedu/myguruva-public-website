@@ -2,7 +2,10 @@ import { prisma } from "../prisma.js";
 import { env } from "../env.js";
 import { ACTIVE, FEE_TOTAL, FEE_TUITION, PUBLISHED, RANK_ENGINEERING, publicSlug } from "../lib/gates.js";
 import { dec, iso, requireOpt } from "../lib/option-sets.js";
-import { overallRanks, tuitionByInstitution, verifiedIds } from "./list.js";
+import { overallRanks, tuitionByInstitution, isInstitutionVerified } from "./list.js";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function getInstitutionBySlug(slug: string) {
   const gated = !env.relaxPublicGates;
@@ -10,19 +13,19 @@ export async function getInstitutionBySlug(slug: string) {
     ? { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE }
     : {};
 
+  // Most preview URLs use institution UUID as the path — check that first.
+  if (UUID_RE.test(slug)) {
+    const byId = await prisma.institution.findFirst({
+      where: { ...publicWhere, wn_institutionid: slug },
+    });
+    if (byId) return { kind: "detail" as const, data: await buildDetail(byId) };
+  }
+
   const bySlug = await prisma.institution.findFirst({
     where: { ...publicWhere, wn_slug: slug },
   });
 
   if (!bySlug) {
-    // TEMP / fallback: treat path segment as institution UUID when slug is missing in CRM
-    const byId = await prisma.institution.findFirst({
-      where: { ...publicWhere, wn_institutionid: slug },
-    });
-    if (byId) {
-      return { kind: "detail" as const, data: await buildDetail(byId) };
-    }
-
     const alias = await prisma.institutionAlias.findFirst({ where: { wn_slug: slug } });
     if (!alias?.wn_institution) return { kind: "notFound" as const };
     const parent = await prisma.institution.findFirst({
@@ -41,46 +44,31 @@ export async function getInstitutionBySlug(slug: string) {
 
 async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.institution.findFirst>>>) {
   const id = i.wn_institutionid;
-  const [verified, tuition, ranksMap] = await Promise.all([
-    verifiedIds(),
-    tuitionByInstitution([id]),
-    overallRanks([id]),
-  ]);
+  const [verified, tuition, ranksMap, aliases, schools, programs, rankings, accreditations, approvals, affiliations, exams, gallery, placements, country, university] =
+    await Promise.all([
+      isInstitutionVerified(id),
+      tuitionByInstitution([id]),
+      overallRanks([id]),
+      prisma.institutionAlias.findMany({ where: { wn_institution: id } }),
+      prisma.school.findMany({ where: { wn_institution: id } }),
+      prisma.institutionCourse.findMany({ where: { wn_institution: id } }),
+      prisma.ranking.findMany({ where: { wn_institution: id }, orderBy: { updated_at: "desc" } }),
+      prisma.accreditation.findMany({ where: { wn_institution: id } }),
+      prisma.approval.findMany({ where: { wn_institution: id } }),
+      prisma.affiliation.findMany({ where: { wn_institution: id } }),
+      prisma.examAccepted.findMany({ where: { wn_institution: id } }),
+      prisma.gallery.findMany({ where: { wn_institution: id }, orderBy: { wn_displayorder: "asc" } }),
+      prisma.placementSummary.findMany({
+        where: { wn_institution: id },
+        orderBy: { updated_at: "desc" },
+        take: 1,
+      }),
+      i.wn_country ? prisma.location.findUnique({ where: { wn_locationid: i.wn_country } }) : null,
+      i.wn_affiliateduniversity
+        ? prisma.institution.findUnique({ where: { wn_institutionid: i.wn_affiliateduniversity } })
+        : null,
+    ]);
   const t = tuition.get(id) ?? { min: null, max: null };
-
-  const [
-    aliases,
-    schools,
-    programs,
-    rankings,
-    accreditations,
-    approvals,
-    affiliations,
-    exams,
-    gallery,
-    placements,
-    country,
-    university,
-  ] = await Promise.all([
-    prisma.institutionAlias.findMany({ where: { wn_institution: id } }),
-    prisma.school.findMany({ where: { wn_institution: id } }),
-    prisma.institutionCourse.findMany({ where: { wn_institution: id } }),
-    prisma.ranking.findMany({ where: { wn_institution: id }, orderBy: { updated_at: "desc" } }),
-    prisma.accreditation.findMany({ where: { wn_institution: id } }),
-    prisma.approval.findMany({ where: { wn_institution: id } }),
-    prisma.affiliation.findMany({ where: { wn_institution: id } }),
-    prisma.examAccepted.findMany({ where: { wn_institution: id } }),
-    prisma.gallery.findMany({ where: { wn_institution: id }, orderBy: { wn_displayorder: "asc" } }),
-    prisma.placementSummary.findMany({
-      where: { wn_institution: id },
-      orderBy: { updated_at: "desc" },
-      take: 1,
-    }),
-    i.wn_country ? prisma.location.findUnique({ where: { wn_locationid: i.wn_country } }) : null,
-    i.wn_affiliateduniversity
-      ? prisma.institution.findUnique({ where: { wn_institutionid: i.wn_affiliateduniversity } })
-      : null,
-  ]);
 
   const streamIds = [
     ...new Set([
@@ -105,13 +93,14 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
   const uniIds = affiliations.map((a) => a.wn_university).filter(Boolean) as string[];
   const programIds = programs.map((p) => p.wn_institutioncourseid);
 
-  const [streams, courses, disciplines, depts, rankingBodies, regBodies, years, entranceExams, unis, fees] =
+  const [streams, courses, disciplines, relatedSchools, depts, rankingBodies, regBodies, years, entranceExams, unis, fees] =
     await Promise.all([
       streamIds.length ? prisma.stream.findMany({ where: { wn_streamid: { in: streamIds } } }) : [],
       courseIds.length ? prisma.course.findMany({ where: { wn_courseid: { in: courseIds } } }) : [],
       disciplineIds.length
         ? prisma.discipline.findMany({ where: { wn_disciplineid: { in: disciplineIds } } })
         : [],
+      schoolIds.length ? prisma.school.findMany({ where: { wn_schoolid: { in: schoolIds } } }) : [],
       deptIds.length ? prisma.department.findMany({ where: { wn_departmentid: { in: deptIds } } }) : [],
       bodyIds.length ? prisma.rankingBody.findMany({ where: { wn_rankingbodyid: { in: bodyIds } } }) : [],
       bodyIds.length
@@ -129,11 +118,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
   const courseBy = new Map(courses.map((c) => [c.wn_courseid, c]));
   const discBy = new Map(disciplines.map((d) => [d.wn_disciplineid, d]));
   const schoolBy = new Map(schools.map((s) => [s.wn_schoolid, s]));
-  for (const s of await (schoolIds.length
-    ? prisma.school.findMany({ where: { wn_schoolid: { in: schoolIds } } })
-    : Promise.resolve([]))) {
-    schoolBy.set(s.wn_schoolid, s);
-  }
+  for (const s of relatedSchools) schoolBy.set(s.wn_schoolid, s);
   const deptBy = new Map(depts.map((d) => [d.wn_departmentid, d]));
   const rbBy = new Map(rankingBodies.map((b) => [b.wn_rankingbodyid, b]));
   const regBy = new Map(regBodies.map((b) => [b.wn_regulatorybodyid, b]));
@@ -175,7 +160,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
     naacGrade: requireOpt("naacGrade", i.wn_naacgrade),
     establishedYear: i.wn_establishedyear,
     isFeatured: !!i.wn_isfeatured,
-    verified: verified.has(id),
+    verified,
     tuitionMin: t.min,
     tuitionMax: t.max,
     latestOverallRank: ranksMap.get(id) ?? null,

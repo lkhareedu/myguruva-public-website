@@ -73,6 +73,7 @@ v1.get("/institutions/:slug", async (req, res, next) => {
       res.redirect(301, `/v1/institutions/${result.primarySlug}`);
       return;
     }
+    res.setHeader("Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300");
     res.json(result.data);
   } catch (e) {
     next(e);

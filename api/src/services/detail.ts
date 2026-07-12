@@ -103,39 +103,39 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
     prisma.$queryRawUnsafe<BundleRow[]>(
       `
       SELECT
-        (SELECT coalesce(json_agg(a ORDER BY a.wn_isprimary DESC NULLS LAST), '[]'::json)
-           FROM institution_alias a WHERE a.wn_institution = $1) AS aliases,
+        (SELECT coalesce(json_agg(a), '[]'::json)
+           FROM institution_alias a WHERE a.wn_institution = $1::uuid) AS aliases,
         (SELECT coalesce(json_agg(s), '[]'::json)
-           FROM schools s WHERE s.wn_institution = $1) AS schools,
+           FROM schools s WHERE s.wn_institution = $1::uuid) AS schools,
         (SELECT coalesce(json_agg(p), '[]'::json)
-           FROM institution_courses p WHERE p.wn_institution = $1) AS programs,
-        (SELECT coalesce(json_agg(r ORDER BY r.updated_at DESC NULLS LAST), '[]'::json)
-           FROM ranking r WHERE r.wn_institution = $1) AS rankings,
+           FROM institution_courses p WHERE p.wn_institution = $1::uuid) AS programs,
+        (SELECT coalesce(json_agg(r), '[]'::json)
+           FROM ranking r WHERE r.wn_institution = $1::uuid) AS rankings,
         (SELECT coalesce(json_agg(ac), '[]'::json)
-           FROM accreditation ac WHERE ac.wn_institution = $1) AS accreditations,
+           FROM accreditation ac WHERE ac.wn_institution = $1::uuid) AS accreditations,
         (SELECT coalesce(json_agg(ap), '[]'::json)
-           FROM approval ap WHERE ap.wn_institution = $1) AS approvals,
+           FROM approval ap WHERE ap.wn_institution = $1::uuid) AS approvals,
         (SELECT coalesce(json_agg(af), '[]'::json)
-           FROM affiliation af WHERE af.wn_institution = $1) AS affiliations,
+           FROM affiliation af WHERE af.wn_institution = $1::uuid) AS affiliations,
         (SELECT coalesce(json_agg(e), '[]'::json)
-           FROM exam_accepted e WHERE e.wn_institution = $1) AS exams,
-        (SELECT coalesce(json_agg(g ORDER BY g.wn_displayorder ASC NULLS LAST), '[]'::json)
-           FROM gallery g WHERE g.wn_institution = $1) AS gallery,
-        (SELECT coalesce(json_agg(ps ORDER BY ps.updated_at DESC NULLS LAST), '[]'::json)
-           FROM placement_summary ps WHERE ps.wn_institution = $1) AS placements,
+           FROM exam_accepted e WHERE e.wn_institution = $1::uuid) AS exams,
+        (SELECT coalesce(json_agg(g), '[]'::json)
+           FROM gallery g WHERE g.wn_institution = $1::uuid) AS gallery,
+        (SELECT coalesce(json_agg(ps), '[]'::json)
+           FROM placement_summary ps WHERE ps.wn_institution = $1::uuid) AS placements,
         (SELECT coalesce(json_agg(fs), '[]'::json)
            FROM fee_structure fs
-           WHERE fs.wn_institution = $1
+           WHERE fs.wn_institution = $1::uuid
               OR fs.wn_institutioncourse IN (
                    SELECT ic.wn_institutioncourseid FROM institution_courses ic
-                   WHERE ic.wn_institution = $1
+                   WHERE ic.wn_institution = $1::uuid
                  )) AS fees,
-        (SELECT l.wn_name FROM location l WHERE l.wn_locationid = $2 LIMIT 1) AS country_name,
-        (SELECT u.wn_name FROM institutions u WHERE u.wn_institutionid = $3 LIMIT 1) AS university_name,
+        (SELECT l.wn_name FROM location l WHERE l.wn_locationid = $2::uuid LIMIT 1) AS country_name,
+        (SELECT u.wn_name FROM institutions u WHERE u.wn_institutionid = $3::uuid LIMIT 1) AS university_name,
         (SELECT min(fs.wn_amountmin) FROM fee_structure fs
-          WHERE fs.wn_institution = $1 AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_min,
+          WHERE fs.wn_institution = $1::uuid AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_min,
         (SELECT max(coalesce(fs.wn_amountmax, fs.wn_amountmin)) FROM fee_structure fs
-          WHERE fs.wn_institution = $1 AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_max
+          WHERE fs.wn_institution = $1::uuid AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_max
       `,
       id,
       i.wn_country,

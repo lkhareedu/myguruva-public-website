@@ -122,6 +122,54 @@ const maps = {
     777770002: "Month",
     777770003: "OneTime",
   },
+  boardAffiliation: {
+    777770000: "CBSE",
+    777770001: "ICSE",
+    777770002: "State Board",
+    777770003: "IB",
+    777770004: "IGCSE",
+    777770005: "Cambridge",
+    777770006: "NIOS",
+    777770007: "Montessori",
+  },
+  educationLevel: {
+    777770000: "UG",
+    777770001: "PG",
+    777770002: "Diploma",
+    777770003: "PhD",
+    777770004: "Certificate",
+    777770005: "Integrated (UG+PG)",
+    777770006: "Post-Diploma",
+  },
+  mediumOfInstruction: {
+    777770000: "English",
+    777770001: "Hindi",
+    777770002: "Regional",
+    777770003: "Bilingual",
+  },
+  hostelType: {
+    777770000: "Boys",
+    777770001: "Girls",
+    777770002: "CoEd",
+    777770003: "PG",
+    777770004: "Faculty",
+    777770005: "International",
+  },
+  facilityType: {
+    777770000: "Library",
+    777770001: "Comp Lab",
+    777770002: "Sci Lab",
+    777770003: "Workshop",
+    777770004: "Auditorium",
+    777770005: "SmartClass",
+    777770006: "Sports",
+    777770007: "Gym",
+    777770008: "Pool",
+    777770009: "Cafe",
+    777770010: "Seminar",
+    777770011: "Innov Lab",
+    777770012: "Lab",
+  },
 } as const;
 
 export function toOpt(
@@ -148,6 +196,20 @@ export function dec(n: { toNumber?: () => number } | number | null | undefined):
   return Number(n);
 }
 
-export function iso(d: Date | null | undefined): string | null {
-  return d ? d.toISOString() : null;
+export function iso(d: Date | string | null | undefined): string | null {
+  if (d == null || d === "") return null;
+  if (typeof d === "string") {
+    const parsed = Date.parse(d);
+    return Number.isNaN(parsed) ? d : new Date(parsed).toISOString();
+  }
+  if (d instanceof Date && !Number.isNaN(d.getTime())) return d.toISOString();
+  return null;
+}
+
+export function optList(
+  set: keyof typeof maps,
+  values: number[] | null | undefined,
+): OptionValue[] {
+  if (!values?.length) return [];
+  return values.map((v) => requireOpt(set, v)).filter((o) => o.value !== -1);
 }

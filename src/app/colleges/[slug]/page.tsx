@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const d = r.data;
   const title = d.metaTitle ?? d.name;
   const description =
-    d.metaDescription ?? d.shortDescription ?? `${d.name} — programs, fees, rankings and admissions.`;
+    d.metaDescription ?? d.description ?? d.shortDescription ?? `${d.name} — programs, fees, rankings and admissions.`;
   return {
     title,
     description,
@@ -71,12 +71,39 @@ export default async function CollegeDetailPage({ params }: Props) {
 }
 
 function DetailBody({ d }: { d: InstitutionDetail }) {
+  const overview = d.description?.trim() || d.shortDescription?.trim() || "";
+  const address = [d.addressLine1, d.addressLine2, d.addressLine3, d.city, d.district, d.state, d.pincode, d.countryName]
+    .filter(Boolean)
+    .join(", ");
+  const alsoKnownAs = (d.aliases ?? []).map((a) => a.name).filter(Boolean);
+  const hostels = d.hostels ?? [];
+  const infrastructure = d.infrastructure ?? [];
+  const institutionFees = d.institutionFees ?? [];
+  const medium = d.mediumOfInstruction ?? [];
+  const amenities: Array<[string, boolean | null]> = [
+    ["Placement cell", d.hasPlacementCell],
+    ["Internship support", d.hasInternshipSupport],
+    ["Alumni network", d.hasAlumniNetwork],
+    ["Grievance cell", d.hasGrievanceCell],
+    ["Anti-ragging", d.hasAntiRagging],
+    ["ICC", d.hasIcc],
+    ["Counselling", d.hasCounselling],
+    ["NSS / NCC", d.hasNssNcc],
+    ["Wi-Fi", d.hasWifi],
+    ["Medical", d.hasMedical],
+    ["Sports", d.hasSports],
+    ["Research center", d.hasResearchCenter],
+    ["Incubation", d.hasIncubation],
+    ["Transport", d.hasTransport],
+  ];
+
   return (
     <div>
       <section className="border-b border-border/60 bg-gradient-to-b from-[color:var(--saffron)]/10 to-transparent">
         <div className="container-page py-10">
           <div className="text-xs text-muted-foreground">
-            <Link href="/colleges" className="hover:text-foreground">Colleges</Link> · {d.state}
+            <Link href="/colleges" className="hover:text-foreground">Colleges</Link>
+            {d.state ? ` · ${d.state}` : ""}
           </div>
           <div className="mt-2 flex items-start justify-between gap-4">
             <div>
@@ -89,10 +116,10 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
             {d.verified ? <VerifiedBadge /> : null}
           </div>
           <div className="mt-4 flex flex-wrap gap-1.5">
-            <span className="chip">{d.institutionType.label}</span>
-            <span className="chip">{d.ownership.label}</span>
-            <span className="chip">{d.genderPolicy.label}</span>
-            <span className="chip">NAAC {d.naacGrade.label}</span>
+            <Chip opt={d.institutionType} />
+            <Chip opt={d.ownership} />
+            <Chip opt={d.genderPolicy} />
+            {known(d.naacGrade) ? <span className="chip">NAAC {d.naacGrade.label}</span> : null}
             {d.aicteApproved ? <span className="chip">AICTE Approved</span> : null}
             {d.ugcRecognized ? <span className="chip">UGC Recognized</span> : null}
           </div>
@@ -102,13 +129,31 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
       <div className="container-page grid gap-10 py-10 lg:grid-cols-[1fr_320px]">
         <div className="space-y-12">
           <Section id="overview" title="Overview">
-            {d.shortDescription && <p className="text-foreground/90">{d.shortDescription}</p>}
+            {overview ? (
+              <p className="whitespace-pre-wrap text-foreground/90">{overview}</p>
+            ) : (
+              <Empty>No overview has been added for this institution yet.</Empty>
+            )}
             <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm md:grid-cols-3">
-              <Fact label="Campus size" value={d.campusSizeAcres ? `${d.campusSizeAcres} acres` : "—"} />
+              <Fact label="Campus size" value={d.campusSizeAcres != null ? `${d.campusSizeAcres} acres` : "—"} />
               <Fact label="Affiliated to" value={d.affiliatedUniversityName ?? "—"} />
               <Fact label="Promoting body" value={d.promotingBody ?? "—"} />
               <Fact label="AISHE code" value={d.aisheCode ?? "—"} />
-              <Fact label="NAAC valid till" value={d.naacValidTill ?? "—"} />
+              <Fact label="NAAC grade" value={known(d.naacGrade) ? d.naacGrade.label : "—"} />
+              <Fact label="NAAC valid till" value={fmtDate(d.naacValidTill)} />
+              <Fact label="Established" value={d.establishedYear ?? "—"} />
+              <Fact label="Institution type" value={known(d.institutionType) ? d.institutionType.label : "—"} />
+              <Fact label="Ownership" value={known(d.ownership) ? d.ownership.label : "—"} />
+              <Fact label="Gender policy" value={known(d.genderPolicy) ? d.genderPolicy.label : "—"} />
+              <Fact label="Minority status" value={known(d.minorityStatus) ? d.minorityStatus.label : "—"} />
+              <Fact label="Education level" value={known(d.educationLevel) ? d.educationLevel.label : "—"} />
+              <Fact label="Board affiliation" value={known(d.boardAffiliation) ? d.boardAffiliation.label : "—"} />
+              <Fact
+                label="Medium of instruction"
+                value={medium.length ? medium.map((m) => m.label).join(", ") : "—"}
+              />
+              <Fact label="UGC recognized" value={boolLabel(d.ugcRecognized)} />
+              <Fact label="AICTE approved" value={boolLabel(d.aicteApproved)} />
               <Fact
                 label="Website"
                 value={
@@ -121,6 +166,20 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                   )
                 }
               />
+              <Fact
+                label="Video tour"
+                value={
+                  d.videoTourUrl ? (
+                    <a className="text-primary hover:underline" href={d.videoTourUrl} target="_blank" rel="noreferrer">
+                      Watch
+                    </a>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+              <Fact label="Also known as" value={alsoKnownAs.length ? alsoKnownAs.join(", ") : "—"} />
+              <Fact label="Address" value={address || "—"} />
             </dl>
           </Section>
 
@@ -134,6 +193,7 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                     <tr>
                       <th className="px-4 py-3">Program</th>
                       <th className="px-4 py-3">Level</th>
+                      <th className="px-4 py-3">Mode</th>
                       <th className="px-4 py-3">Duration</th>
                       <th className="px-4 py-3">Seats</th>
                       <th className="px-4 py-3">Tuition / yr</th>
@@ -141,14 +201,26 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                   </thead>
                   <tbody>
                     {d.programs.map((p) => (
-                      <tr key={p.id} className="border-t border-border">
+                      <tr key={p.id} className="border-t border-border align-top">
                         <td className="px-4 py-3">
                           <div className="font-medium">{p.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {[p.streamName, p.disciplineName].filter(Boolean).join(" · ")}
+                            {[p.streamName, p.disciplineName, p.schoolName, p.departmentName].filter(Boolean).join(" · ")}
                           </div>
+                          {p.fees.length > 0 ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {p.fees.map((f, idx) => (
+                                <div key={idx}>
+                                  {f.feeCategory.label}: {fmtFee(f.amountMin)}
+                                  {f.amountMax != null && f.amountMax !== f.amountMin ? ` – ${fmtFee(f.amountMax)}` : ""}
+                                  {known(f.frequency) ? ` / ${f.frequency.label}` : ""}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                         </td>
-                        <td className="px-4 py-3">{p.degreeLevel.label}</td>
+                        <td className="px-4 py-3">{known(p.degreeLevel) ? p.degreeLevel.label : "—"}</td>
+                        <td className="px-4 py-3">{known(p.educationMode) ? p.educationMode.label : "—"}</td>
                         <td className="px-4 py-3">{p.durationYears ? `${p.durationYears} yrs` : "—"}</td>
                         <td className="px-4 py-3">{p.totalSeats ?? "—"}</td>
                         <td className="px-4 py-3">
@@ -161,6 +233,12 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                 </table>
               </div>
             )}
+            {institutionFees.length > 0 && d.programs.every((p) => p.fees.length === 0) ? (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Institution fee rows:{" "}
+                {institutionFees.map((f) => `${f.feeCategory.label} ${fmtFee(f.amountMin)}`).join(" · ")}
+              </div>
+            ) : null}
           </Section>
 
           <Section id="rankings" title="Rankings">
@@ -171,7 +249,9 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                 {d.rankings.map((r, idx) => (
                   <li key={idx} className="rounded-lg border border-border bg-card p-4">
                     <div className="text-xs text-muted-foreground">
-                      {r.rankingBodyName} · {r.category.label} · {r.academicYearName}
+                      {r.rankingBodyName}
+                      {known(r.category) ? ` · ${r.category.label}` : ""}
+                      {r.academicYearName ? ` · ${r.academicYearName}` : ""}
                     </div>
                     <div className="mt-1 flex items-baseline gap-2">
                       <span className="font-display text-3xl">{r.rank ?? "—"}</span>
@@ -190,17 +270,29 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
             <div className="grid gap-6 md:grid-cols-3">
               <QualityBlock
                 title="Accreditation"
-                rows={d.accreditations.map(
-                  (a) => `${a.bodyName} — ${a.grade.label}${a.cgpaScore ? ` (${a.cgpaScore})` : ""}`,
-                )}
+                rows={d.accreditations.map((a) => {
+                  const parts = [a.bodyName, known(a.grade) ? a.grade.label : null, a.cgpaScore != null ? `CGPA ${a.cgpaScore}` : null]
+                    .filter(Boolean);
+                  const dates = [a.validFrom ? `from ${fmtDate(a.validFrom)}` : null, a.validTill ? `till ${fmtDate(a.validTill)}` : null]
+                    .filter(Boolean)
+                    .join(" ");
+                  return `${parts.join(" — ")}${dates ? ` (${dates})` : ""}`;
+                })}
               />
               <QualityBlock
                 title="Approvals"
-                rows={d.approvals.map((a) => `${a.bodyName} — ${a.approvalStatus.label}`)}
+                rows={d.approvals.map((a) => {
+                  const status = known(a.approvalStatus) ? a.approvalStatus.label : null;
+                  const num = a.approvalNumber ? `#${a.approvalNumber}` : null;
+                  return [a.bodyName, status, num].filter(Boolean).join(" — ");
+                })}
               />
               <QualityBlock
                 title="Affiliations"
-                rows={d.affiliations.map((a) => `${a.universityName} — ${a.affiliationType.label}`)}
+                rows={d.affiliations.map((a) => {
+                  const typ = known(a.affiliationType) ? a.affiliationType.label : null;
+                  return [a.universityName, typ, a.isCurrent ? "Current" : null].filter(Boolean).join(" — ");
+                })}
               />
             </div>
           </Section>
@@ -215,7 +307,7 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                     <div>
                       <div className="font-medium">{e.examShortName ?? e.examName}</div>
                       <div className="text-xs text-muted-foreground">
-                        {e.applicableCourseName ?? "All programs"} · {e.academicYearName}
+                        {[e.applicableCourseName ?? "All programs", e.academicYearName].filter(Boolean).join(" · ")}
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -226,33 +318,68 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                 ))}
               </ul>
             )}
+            {d.programs.some((p) => p.eligibilityCriteria || p.admissionProcess) ? (
+              <div className="mt-6 space-y-3 text-sm">
+                {d.programs
+                  .filter((p) => p.eligibilityCriteria || p.admissionProcess)
+                  .map((p) => (
+                    <div key={p.id} className="rounded-lg border border-border p-4">
+                      <div className="font-medium">{p.name}</div>
+                      {p.eligibilityCriteria ? (
+                        <p className="mt-1 text-muted-foreground">Eligibility: {p.eligibilityCriteria}</p>
+                      ) : null}
+                      {p.admissionProcess ? (
+                        <p className="mt-1 text-muted-foreground">Process: {p.admissionProcess}</p>
+                      ) : null}
+                    </div>
+                  ))}
+              </div>
+            ) : null}
           </Section>
 
           <Section id="campus" title="Campus & amenities">
-            <div className="flex flex-wrap gap-2">
-              {Object.entries({
-                "Placement cell": d.hasPlacementCell,
-                "Internship support": d.hasInternshipSupport,
-                "Alumni network": d.hasAlumniNetwork,
-                "Grievance cell": d.hasGrievanceCell,
-                "Anti-ragging": d.hasAntiRagging,
-                ICC: d.hasIcc,
-                Counselling: d.hasCounselling,
-                "NSS / NCC": d.hasNssNcc,
-                "Wi-Fi": d.hasWifi,
-                Medical: d.hasMedical,
-                Sports: d.hasSports,
-                "Research center": d.hasResearchCenter,
-                Incubation: d.hasIncubation,
-                Transport: d.hasTransport,
-              })
-                .filter(([, v]) => v)
-                .map(([label]) => (
-                  <span key={label} className="chip">
-                    {label}
-                  </span>
-                ))}
-            </div>
+            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 md:grid-cols-4">
+              {amenities.map(([label, v]) => (
+                <Fact key={label} label={label} value={boolLabel(v)} />
+              ))}
+            </dl>
+            {hostels.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="mb-2 text-sm font-medium">Hostels</h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {hostels.map((h, idx) => (
+                    <li key={idx} className="rounded-lg border border-border p-4 text-sm">
+                      <div className="font-medium">{h.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {[known(h.hostelType) ? h.hostelType.label : null, h.totalCapacity ? `${h.totalCapacity} seats` : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                      {h.annualFeeMin != null ? (
+                        <div className="mt-1 text-muted-foreground">Fee {fmtFee(h.annualFeeMin)}–{fmtFee(h.annualFeeMax)}</div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {infrastructure.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="mb-2 text-sm font-medium">Infrastructure</h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {infrastructure.map((inf, idx) => (
+                    <li key={idx} className="rounded-lg border border-border p-4 text-sm">
+                      <div className="font-medium">{inf.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {known(inf.facilityType) ? inf.facilityType.label : ""}
+                        {inf.capacity ? ` · capacity ${inf.capacity}` : ""}
+                      </div>
+                      {inf.description ? <p className="mt-1 text-muted-foreground">{inf.description}</p> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {d.gallery.length > 0 && (
               <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
                 {d.gallery.map((g, idx) => (
@@ -278,7 +405,7 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <Fact label="NIRF" value={d.latestOverallRank ?? "—"} />
-              <Fact label="NAAC" value={d.naacGrade.label} />
+              <Fact label="NAAC" value={known(d.naacGrade) ? d.naacGrade.label : "—"} />
               {d.placement?.placementPct != null && (
                 <Fact label="Placement" value={`${d.placement.placementPct}%`} />
               )}
@@ -292,26 +419,44 @@ function DetailBody({ d }: { d: InstitutionDetail }) {
                 verified={d.verified}
                 className="w-full"
               />
-              {!d.verified ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Only Verified colleges can be added to Compare.
-                </p>
-              ) : null}
             </div>
           </div>
           <div className="rounded-xl border border-border bg-card p-5 text-sm">
             <div className="font-medium">Contact</div>
             <div className="mt-2 space-y-1 text-muted-foreground">
-              {d.phone && <div>📞 {d.phone}</div>}
-              {d.email && <div>✉ {d.email}</div>}
+              {d.phone && <div>{d.phone}</div>}
+              {d.email && <div>{d.email}</div>}
               {d.admissionsEmail && <div>Admissions: {d.admissionsEmail}</div>}
-              {!d.phone && !d.email && <div>No public contact details.</div>}
+              {address ? <div className="pt-1">{address}</div> : null}
+              {!d.phone && !d.email && !address && <div>No public contact details.</div>}
             </div>
           </div>
         </aside>
       </div>
     </div>
   );
+}
+
+function known(opt: { value: number; label: string } | null | undefined) {
+  return !!opt && opt.value !== -1 && opt.label !== "Unknown";
+}
+
+function Chip({ opt, prefix }: { opt: { value: number; label: string }; prefix?: string }) {
+  if (!known(opt)) return null;
+  return <span className="chip">{prefix ? `${prefix} ${opt.label}` : opt.label}</span>;
+}
+
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function boolLabel(v: boolean | null | undefined) {
+  if (v === true) return "Yes";
+  if (v === false) return "No";
+  return "—";
 }
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {

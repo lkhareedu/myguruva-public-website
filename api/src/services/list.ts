@@ -1,12 +1,10 @@
 import { prisma } from "../prisma.js";
-import { env } from "../env.js";
 import {
   FEE_TOTAL,
   FEE_TUITION,
-  PUBLISHED,
   RANK_OVERALL,
   REVIEW_COMPLETED,
-  ACTIVE,
+  publicName,
   publicSlug,
 } from "../lib/gates.js";
 import { dec, requireOpt } from "../lib/option-sets.js";
@@ -123,12 +121,7 @@ async function buildListWhere(f: ListFilters): Promise<{
   conditions: string[];
   params: unknown[];
 }> {
-  const conditions: string[] = ["i.wn_name IS NOT NULL"];
-  if (!env.relaxPublicGates) {
-    conditions.push(`i.wn_publishstatus = ${PUBLISHED}`);
-    conditions.push(`i.wn_currentstatus = ${ACTIVE}`);
-    conditions.push(`i.wn_slug IS NOT NULL`);
-  }
+  const conditions: string[] = ["TRUE"];
   const params: unknown[] = [];
   let p = 1;
 
@@ -296,13 +289,13 @@ export async function listInstitutions(f: ListFilters = {}) {
   const items = ids
     .map((id) => {
       const i = byId.get(id);
-      if (!i?.wn_name) return null;
+      if (!i) return null;
       const t = tuition.get(id) ?? { min: null, max: null };
       return {
         id: i.wn_institutionid,
-        name: i.wn_name,
+        name: publicName(i.wn_name),
         slug: publicSlug(i),
-        shortDescription: plainTeaser(i.wn_shortdescription, 160),
+        shortDescription: plainTeaser(i.wn_shortdescription ?? i.wn_description, 160),
         logoUrl: i.wn_logourl,
         coverImageUrl: i.wn_coverimageurl,
         city: i.wn_city,

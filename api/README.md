@@ -1,6 +1,6 @@
 # MyGuruva Public API
 
-Read-only Express + Prisma middleware for the public college site. Talks to the same Azure Postgres as the CRM. No auth; listing gates are enforced in SQL.
+Read-only Express + Prisma middleware for the public college site. Talks to the same Azure Postgres as the CRM. No auth. Every institution row is listed (publish/active gates are off).
 
 ## Local
 

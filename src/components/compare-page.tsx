@@ -50,7 +50,7 @@ function CompareInner() {
         <div>
           <h1 className="font-display text-4xl">Compare colleges</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Verified institutions only · Pick up to {COMPARE_MAX}
+            Pick up to {COMPARE_MAX} colleges from the catalog
           </p>
         </div>
         {selected.length > 0 && (
@@ -71,7 +71,7 @@ function CompareInner() {
 
       {droppedCount > 0 && !compareQuery.isFetching ? (
         <div className="mb-4 rounded-md border border-border bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-          {droppedCount} of your picks are not Verified and were excluded from the comparison.
+          {droppedCount} of your picks could not be loaded for comparison.
         </div>
       ) : null}
 
@@ -86,17 +86,17 @@ function CompareInner() {
             Search above, or add colleges from any listing or detail page. Your picks are saved to this device.
           </p>
           <Link
-            href="/colleges?verified=true"
+            href="/colleges"
             className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
-            Browse Verified colleges
+            Browse colleges
           </Link>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
           {compareQuery.isFetching
             ? "Loading comparison…"
-            : "None of your picks are Verified. Add Verified colleges to compare."}
+            : "Could not load those colleges. Try adding them again from the directory."}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">

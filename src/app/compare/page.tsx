@@ -4,10 +4,11 @@ import { ComparePageClient } from "@/components/compare-page";
 export const metadata: Metadata = {
   title: "Compare colleges",
   description:
-    "Compare up to four Verified Indian colleges side by side — fees, NAAC, NIRF rank, seats and amenities.",
+  description:
+    "Compare up to four Indian colleges side by side — fees, NAAC, NIRF rank, seats and amenities.",
   openGraph: {
     title: "Compare colleges — MyGuruva",
-    description: "Compare up to four Verified Indian colleges side by side.",
+    description: "Compare up to four Indian colleges side by side.",
     url: "/compare",
   },
   alternates: { canonical: "/compare" },

@@ -116,7 +116,7 @@ export default async function HomePage() {
             <div className="max-w-xl">
               <h2 className="font-display text-3xl">Compare, side by side.</h2>
               <p className="mt-2 text-muted-foreground">
-                Line up to four Verified colleges — fees, NAAC, NIRF, seats, placements and amenities in one table.
+                Line up to four colleges — fees, NAAC, NIRF, seats, placements and amenities in one table.
               </p>
             </div>
             <Link

@@ -1,11 +1,10 @@
 import { prisma } from "../prisma.js";
-import { env } from "../env.js";
-import { ACTIVE, FEE_TOTAL, FEE_TUITION, PUBLISHED, RANK_ENGINEERING, RANK_OVERALL, publicSlug } from "../lib/gates.js";
-import { dec, iso, requireOpt } from "../lib/option-sets.js";
+import { FEE_TOTAL, FEE_TUITION, RANK_ENGINEERING, RANK_OVERALL, asUuid, publicName, publicSlug } from "../lib/gates.js";
+import { dec, iso, optList, requireOpt } from "../lib/option-sets.js";
 import { isInstitutionVerified } from "./list.js";
 
 const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CacheEntry = { at: number; data: unknown };
 const detailCache = new Map<string, CacheEntry>();
@@ -33,14 +32,9 @@ export async function getInstitutionBySlug(slug: string) {
   const cached = getCached(slug);
   if (cached) return { kind: "detail" as const, data: cached as Awaited<ReturnType<typeof buildDetail>> };
 
-  const gated = !env.relaxPublicGates;
-  const publicWhere = gated
-    ? { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE }
-    : {};
-
   if (UUID_RE.test(slug)) {
     const byId = await prisma.institution.findFirst({
-      where: { ...publicWhere, wn_institutionid: slug },
+      where: { wn_institutionid: slug },
     });
     if (byId) {
       const data = await buildDetail(byId);
@@ -51,14 +45,14 @@ export async function getInstitutionBySlug(slug: string) {
   }
 
   const bySlug = await prisma.institution.findFirst({
-    where: { ...publicWhere, wn_slug: slug },
+    where: { wn_slug: slug },
   });
 
   if (!bySlug) {
     const alias = await prisma.institutionAlias.findFirst({ where: { wn_slug: slug } });
     if (!alias?.wn_institution) return { kind: "notFound" as const };
     const parent = await prisma.institution.findFirst({
-      where: { ...publicWhere, wn_institutionid: alias.wn_institution },
+      where: { wn_institutionid: alias.wn_institution },
     });
     if (!parent) return { kind: "notFound" as const };
     const primary = publicSlug(parent);
@@ -88,6 +82,8 @@ type BundleRow = {
   exams: unknown;
   gallery: unknown;
   placements: unknown;
+  hostels: unknown;
+  infrastructure: unknown;
   fees: unknown;
   country_name: string | null;
   university_name: string | null;
@@ -97,6 +93,8 @@ type BundleRow = {
 
 async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.institution.findFirst>>>) {
   const id = i.wn_institutionid;
+  const countryId = asUuid(i.wn_country);
+  const universityId = asUuid(i.wn_affiliateduniversity);
 
   const [verified, bundleRows] = await Promise.all([
     isInstitutionVerified(id),
@@ -123,6 +121,10 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
            FROM gallery g WHERE g.wn_institution = $1::uuid) AS gallery,
         (SELECT coalesce(json_agg(ps), '[]'::json)
            FROM placement_summary ps WHERE ps.wn_institution = $1::uuid) AS placements,
+        (SELECT coalesce(json_agg(h), '[]'::json)
+           FROM hostel h WHERE h.wn_institution = $1::uuid) AS hostels,
+        (SELECT coalesce(json_agg(inf), '[]'::json)
+           FROM infrastructure inf WHERE inf.wn_institution = $1::uuid) AS infrastructure,
         (SELECT coalesce(json_agg(fs), '[]'::json)
            FROM fee_structure fs
            WHERE fs.wn_institution = $1::uuid
@@ -130,16 +132,26 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
                    SELECT ic.wn_institutioncourseid FROM institution_courses ic
                    WHERE ic.wn_institution = $1::uuid
                  )) AS fees,
-        (SELECT l.wn_name FROM location l WHERE l.wn_locationid = $2::uuid LIMIT 1) AS country_name,
-        (SELECT u.wn_name FROM institutions u WHERE u.wn_institutionid = $3::uuid LIMIT 1) AS university_name,
+        (SELECT l.wn_name FROM location l WHERE $2::uuid IS NOT NULL AND l.wn_locationid = $2::uuid LIMIT 1) AS country_name,
+        (SELECT u.wn_name FROM institutions u WHERE $3::uuid IS NOT NULL AND u.wn_institutionid = $3::uuid LIMIT 1) AS university_name,
         (SELECT min(fs.wn_amountmin) FROM fee_structure fs
-          WHERE fs.wn_institution = $1::uuid AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_min,
+          WHERE (fs.wn_institution = $1::uuid
+                 OR fs.wn_institutioncourse IN (
+                      SELECT ic.wn_institutioncourseid FROM institution_courses ic
+                      WHERE ic.wn_institution = $1::uuid
+                    ))
+            AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_min,
         (SELECT max(coalesce(fs.wn_amountmax, fs.wn_amountmin)) FROM fee_structure fs
-          WHERE fs.wn_institution = $1::uuid AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_max
+          WHERE (fs.wn_institution = $1::uuid
+                 OR fs.wn_institutioncourse IN (
+                      SELECT ic.wn_institutioncourseid FROM institution_courses ic
+                      WHERE ic.wn_institution = $1::uuid
+                    ))
+            AND fs.wn_feecategory IN (${FEE_TUITION}, ${FEE_TOTAL})) AS tuition_max
       `,
       id,
-      i.wn_country,
-      i.wn_affiliateduniversity,
+      countryId,
+      universityId,
     ),
   ]);
 
@@ -154,6 +166,8 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
   const exams = asArr(b.exams);
   const gallery = asArr(b.gallery);
   const placements = asArr(b.placements);
+  const hostels = asArr(b.hostels);
+  const infrastructure = asArr(b.infrastructure);
   const fees = asArr(b.fees);
 
   const streamIds = uniq([
@@ -232,15 +246,32 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
   const uniBy = mapBy(unis, "wn_institutionid");
 
   const feesByProgram = new Map<string, any[]>();
+  const institutionFees: any[] = [];
   for (const fee of fees) {
     const pid = fee.wn_institutioncourse;
-    if (!pid) continue;
+    if (!pid) {
+      institutionFees.push(fee);
+      continue;
+    }
     const list = feesByProgram.get(pid) ?? [];
     list.push(fee);
     feesByProgram.set(pid, list);
   }
 
-  const engg = rankings.find((r) => r.wn_category === RANK_ENGINEERING);
+  const mapFee = (f: any) => ({
+    feeCategory: requireOpt("feeCategory", optNum(f.wn_feecategory)),
+    amountMin: dec(f.wn_amountmin),
+    amountMax: dec(f.wn_amountmax),
+    frequency: requireOpt("feeFrequency", optNum(f.wn_frequency)),
+    notes: f.wn_notes ?? null,
+    academicYearName: f.wn_academicyear ? (yearBy.get(f.wn_academicyear)?.wn_name ?? null) : null,
+  });
+
+  const instTuition = institutionFees.filter((f) => f.wn_feecategory === FEE_TUITION);
+  const instTMin = instTuition.map((f) => dec(f.wn_amountmin)).filter((n): n is number => n != null);
+  const instTMax = instTuition.map((f) => dec(f.wn_amountmax)).filter((n): n is number => n != null);
+
+  const engg = rankings.find((r) => Number(r.wn_category) === RANK_ENGINEERING);
   const placementRow = placements[0];
   const placement = placementRow
     ? {
@@ -249,15 +280,16 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
           dec(placementRow.wn_averagepackagemin) ??
           dec(placementRow.wn_medianpackage) ??
           dec(placementRow.wn_averagepackagemax),
-        highestDomestic: dec(placementRow.wn_highestdomestic),
+        highestPackage: dec(placementRow.wn_highestdomestic),
       }
     : null;
 
   return {
     id: i.wn_institutionid,
-    name: i.wn_name!,
+    name: publicName(i.wn_name),
     slug: publicSlug(i),
     shortDescription: i.wn_shortdescription,
+    description: i.wn_description,
     logoUrl: i.wn_logourl,
     coverImageUrl: i.wn_coverimageurl,
     city: i.wn_city,
@@ -282,6 +314,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
     aicteApproved: i.wn_aicteapproved,
     addressLine1: i.wn_addressline1,
     addressLine2: i.wn_addressline2,
+    addressLine3: i.wn_addressline3,
     district: i.wn_district,
     pincode: i.wn_pincode,
     countryName: b.country_name ?? null,
@@ -294,6 +327,9 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
     website: i.wn_website,
     promotingBody: i.wn_promotingbody,
     affiliatedUniversityName: b.university_name ?? null,
+    boardAffiliation: requireOpt("boardAffiliation", i.wn_boardaffiliation),
+    educationLevel: requireOpt("educationLevel", i.wn_educationlevels),
+    mediumOfInstruction: optList("mediumOfInstruction", i.wn_mediumofinstruction),
     hasWifi: i.wn_haswifi,
     hasMedical: i.wn_hasmedical,
     hasSports: i.wn_hassports,
@@ -358,18 +394,11 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
         nbaValidTill: iso(p.wn_nbavalidtill),
         eligibilityCriteria: p.wn_eligibilitycriteria,
         admissionProcess: p.wn_admissionprocess,
-        tuitionMin: tMin.length ? Math.min(...tMin) : null,
-        tuitionMax: tMax.length ? Math.max(...tMax) : null,
+        tuitionMin: tMin.length ? Math.min(...tMin) : instTMin.length ? Math.min(...instTMin) : null,
+        tuitionMax: tMax.length ? Math.max(...tMax) : instTMax.length ? Math.max(...instTMax) : null,
         totalFeeMin: totMin.length ? Math.min(...totMin) : null,
         totalFeeMax: totMax.length ? Math.max(...totMax) : null,
-        fees: progFees.map((f) => ({
-          feeCategory: requireOpt("feeCategory", f.wn_feecategory),
-          amountMin: dec(f.wn_amountmin),
-          amountMax: dec(f.wn_amountmax),
-          frequency: requireOpt("feeFrequency", f.wn_frequency),
-          notes: f.wn_notes,
-          academicYearName: f.wn_academicyear ? (yearBy.get(f.wn_academicyear)?.wn_name ?? null) : null,
-        })),
+        fees: (progFees.length ? progFees : institutionFees).map(mapFee),
       };
     }),
     rankings: rankings.map((r) => ({
@@ -384,7 +413,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
       bodyName: a.wn_regulatorybody ? (regBy.get(a.wn_regulatorybody)?.wn_name ?? "Unknown") : "Unknown",
       grade: requireOpt("accreditationGrade", a.wn_grade),
       cgpaScore: dec(a.wn_cgpascore),
-      cycleNumber: a.wn_cyclenumber,
+      cycleNumber: a.wn_cyclenumber != null ? String(a.wn_cyclenumber) : null,
       validFrom: iso(a.wn_validfrom),
       validTill: iso(a.wn_validtill),
       programName: null as string | null,
@@ -418,9 +447,42 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
       altText: g.wn_alttext,
       isFeatured: !!g.wn_isfeatured,
     })),
+    hostels: hostels.map((h) => ({
+      name: h.wn_name ?? "Hostel",
+      hostelType: requireOpt("hostelType", optNum(h.wn_hosteltype)),
+      totalRooms: h.wn_totalrooms ?? null,
+      totalCapacity: h.wn_totalcapacity ?? null,
+      annualFeeMin: dec(h.wn_annualfeemin),
+      annualFeeMax: dec(h.wn_annualfeemax),
+      messFeeMin: dec(h.wn_messfeemin),
+      messFeeMax: dec(h.wn_messfeemax),
+      description: h.wn_description ?? null,
+      hasAc: h.wn_hasac ?? null,
+      hasWifi: h.wn_haswifi ?? null,
+      hasMess: h.wn_hasmess ?? null,
+      hasGym: h.wn_hasgym ?? null,
+      hasLaundry: h.wn_haslaundry ?? null,
+    })),
+    infrastructure: infrastructure.map((inf) => ({
+      name: inf.wn_name ?? "Facility",
+      facilityType: requireOpt("facilityType", optNum(inf.wn_facilitytype)),
+      capacity: inf.wn_capacity ?? null,
+      areaSqft: dec(inf.wn_areasqft),
+      description: inf.wn_description ?? null,
+      equipmentHighlights: inf.wn_equipmenthighlights ?? null,
+      libraryVolumes: inf.wn_libraryvolumes ?? null,
+      libraryJournals: inf.wn_libraryjournals ?? null,
+    })),
+    institutionFees: institutionFees.map(mapFee),
     placement,
     latestEngineeringRank: engg?.wn_rank ?? null,
   };
+}
+
+function optNum(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function asArr(v: unknown): any[] {

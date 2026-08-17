@@ -128,6 +128,7 @@ export type InstitutionCard = {
 };
 
 export type InstitutionDetail = InstitutionCard & {
+  description: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
   videoTourUrl: string | null;
@@ -139,6 +140,7 @@ export type InstitutionDetail = InstitutionCard & {
   aicteApproved: boolean | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  addressLine3: string | null;
   district: string | null;
   pincode: string | null;
   countryName: string | null;
@@ -151,6 +153,9 @@ export type InstitutionDetail = InstitutionCard & {
   website: string | null;
   promotingBody: string | null;
   affiliatedUniversityName: string | null;
+  boardAffiliation: OptionValue;
+  educationLevel: OptionValue;
+  mediumOfInstruction: OptionValue[];
   hasPlacementCell: boolean | null;
   hasInternshipSupport: boolean | null;
   hasAlumniNetwork: boolean | null;
@@ -175,7 +180,38 @@ export type InstitutionDetail = InstitutionCard & {
   affiliations: AffiliationRow[];
   examsAccepted: ExamAcceptedRow[];
   gallery: { mediaUrl: string; thumbnailUrl: string | null; altText: string | null; isFeatured: boolean }[];
+  hostels: HostelRow[];
+  infrastructure: InfrastructureRow[];
+  institutionFees: FeeRow[];
   placement: { placementPct: number | null; averagePackage: number | null; highestPackage: number | null } | null;
+};
+
+export type HostelRow = {
+  name: string;
+  hostelType: OptionValue;
+  totalRooms: number | null;
+  totalCapacity: number | null;
+  annualFeeMin: number | null;
+  annualFeeMax: number | null;
+  messFeeMin: number | null;
+  messFeeMax: number | null;
+  description: string | null;
+  hasAc: boolean | null;
+  hasWifi: boolean | null;
+  hasMess: boolean | null;
+  hasGym: boolean | null;
+  hasLaundry: boolean | null;
+};
+
+export type InfrastructureRow = {
+  name: string;
+  facilityType: OptionValue;
+  capacity: number | null;
+  areaSqft: number | null;
+  description: string | null;
+  equipmentHighlights: string | null;
+  libraryVolumes: number | null;
+  libraryJournals: number | null;
 };
 
 // -------- Seed helpers --------
@@ -184,6 +220,14 @@ const ay = "2024-2025";
 
 function baseAmenities(overrides: Partial<InstitutionDetail> = {}) {
   return {
+    description: null as string | null,
+    addressLine3: null as string | null,
+    boardAffiliation: { value: -1, label: "Unknown" },
+    educationLevel: { value: -1, label: "Unknown" },
+    mediumOfInstruction: [] as { value: number; label: string }[],
+    hostels: [] as InstitutionDetail["hostels"],
+    infrastructure: [] as InstitutionDetail["infrastructure"],
+    institutionFees: [] as InstitutionDetail["institutionFees"],
     hasPlacementCell: true,
     hasInternshipSupport: true,
     hasAlumniNetwork: true,

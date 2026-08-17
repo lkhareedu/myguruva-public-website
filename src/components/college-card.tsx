@@ -105,9 +105,9 @@ export function CollegeCard({ i }: { i: InstitutionCard }) {
         )}
 
         <div className="mt-2.5 flex min-w-0 flex-wrap gap-1">
-          <span className="chip max-w-[9.5rem] truncate">{i.institutionType.label}</span>
-          <span className="chip truncate">{i.ownership.label}</span>
-          {i.naacGrade?.label && i.naacGrade.label !== "—" ? (
+          <span className="chip max-w-[9.5rem] truncate">{i.institutionType.label !== "Unknown" ? i.institutionType.label : "Type —"}</span>
+          {i.ownership.label !== "Unknown" ? <span className="chip truncate">{i.ownership.label}</span> : null}
+          {i.naacGrade?.label && i.naacGrade.label !== "—" && i.naacGrade.label !== "Unknown" ? (
             <span className="chip">NAAC {i.naacGrade.label}</span>
           ) : null}
         </div>

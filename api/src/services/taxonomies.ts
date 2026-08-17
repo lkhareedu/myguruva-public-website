@@ -1,21 +1,19 @@
 import { prisma } from "../prisma.js";
-import { env } from "../env.js";
 import { publicSlug } from "../lib/gates.js";
 import { requireOpt } from "../lib/option-sets.js";
 
 export async function listStreams() {
   const items = await prisma.stream.findMany({
-    where: env.relaxPublicGates ? undefined : { wn_isactive: true },
     orderBy: [{ wn_displayorder: "asc" }, { wn_name: "asc" }],
   });
   return {
     items: items
-      .filter((s) => s.wn_slug && s.wn_name)
+      .filter((s) => s.wn_name)
       .map((s) => ({
         id: s.wn_streamid,
         name: s.wn_name!,
         shortName: s.wn_shortname,
-        slug: s.wn_slug!,
+        slug: s.wn_slug?.trim() || s.wn_streamid,
       })),
   };
 }
@@ -24,12 +22,12 @@ export async function listCourses() {
   const items = await prisma.course.findMany({ orderBy: { wn_name: "asc" } });
   return {
     items: items
-      .filter((c) => c.wn_slug && c.wn_name)
+      .filter((c) => c.wn_name)
       .map((c) => ({
         id: c.wn_courseid,
         name: c.wn_name!,
         shortName: c.wn_shortname,
-        slug: c.wn_slug!,
+        slug: c.wn_slug?.trim() || c.wn_courseid,
         degreeLevel: requireOpt("degreeLevel", c.wn_degreelevel),
       })),
   };
@@ -45,7 +43,6 @@ export async function listLocations(type?: string, parentId?: string) {
     where: {
       ...(type && typeMap[type] != null ? { wn_locationtype: typeMap[type] } : {}),
       ...(parentId ? { wn_parentlocation: parentId } : {}),
-      ...(env.relaxPublicGates ? {} : { wn_isactive: true }),
     },
     orderBy: [{ wn_displayorder: "asc" }, { wn_name: "asc" }],
   });
@@ -67,12 +64,12 @@ export async function listExams() {
   const items = await prisma.entranceExam.findMany({ orderBy: { wn_name: "asc" } });
   return {
     items: items
-      .filter((e) => e.wn_slug && e.wn_name)
+      .filter((e) => e.wn_name)
       .map((e) => ({
         id: e.wn_entranceexamid,
         name: e.wn_name!,
         shortName: e.wn_shortname,
-        slug: e.wn_slug!,
+        slug: e.wn_slug?.trim() || e.wn_entranceexamid,
       })),
   };
 }
@@ -81,28 +78,20 @@ export async function listRankingBodies() {
   const items = await prisma.rankingBody.findMany({ orderBy: { wn_name: "asc" } });
   return {
     items: items
-      .filter((b) => b.wn_slug && b.wn_name)
+      .filter((b) => b.wn_name)
       .map((b) => ({
         id: b.wn_rankingbodyid,
         name: b.wn_name!,
         shortName: b.wn_shortname,
-        slug: b.wn_slug!,
+        slug: b.wn_slug?.trim() || b.wn_rankingbodyid,
       })),
   };
 }
 
 export async function sitemapInstitutions() {
   const items = await prisma.institution.findMany({
-    where: env.relaxPublicGates
-      ? { wn_name: { not: null } }
-      : {
-          wn_publishstatus: 777770002,
-          wn_currentstatus: 777770000,
-          wn_slug: { not: null },
-        },
     select: { wn_institutionid: true, wn_slug: true, updated_at: true },
     orderBy: { updated_at: "desc" },
-    take: env.relaxPublicGates ? 5000 : undefined,
   });
   return {
     items: items.map((i) => ({

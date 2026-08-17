@@ -14,8 +14,9 @@ export const env = {
     .map((s) => s.trim())
     .filter(Boolean),
   /**
-   * TEMP: when true (default), skip Published/Active/slug gates so CRM draft data appears.
-   * Set RELAX_PUBLIC_GATES=false to restore production visibility rules.
+   * Visibility gates are off: every institution row is public.
+   * Kept so existing call sites compile; do not re-enable publish/active filters
+   * without an explicit product decision.
    */
-  relaxPublicGates: process.env.RELAX_PUBLIC_GATES !== "false",
+  relaxPublicGates: true,
 };

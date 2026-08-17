@@ -1,6 +1,5 @@
 import { prisma } from "../prisma.js";
-import { env } from "../env.js";
-import { ACTIVE, PUBLISHED, RANK_ENGINEERING, publicSlug } from "../lib/gates.js";
+import { RANK_ENGINEERING, publicName, publicSlug } from "../lib/gates.js";
 import { dec, requireOpt } from "../lib/option-sets.js";
 import { overallRanks, tuitionByInstitution, verifiedIds } from "./list.js";
 
@@ -12,9 +11,6 @@ export async function compareInstitutions(slugs: string[]) {
   const institutions = await prisma.institution.findMany({
     where: {
       OR: [{ wn_slug: { in: unique } }, { wn_institutionid: { in: unique } }],
-      ...(env.relaxPublicGates
-        ? {}
-        : { wn_publishstatus: PUBLISHED, wn_currentstatus: ACTIVE }),
     },
   });
 
@@ -23,11 +19,7 @@ export async function compareInstitutions(slugs: string[]) {
       (s) =>
         institutions.find((i) => i.wn_slug === s || i.wn_institutionid === s) ?? null,
     )
-    .filter((i): i is NonNullable<typeof i> => {
-      if (!i) return false;
-      if (env.relaxPublicGates) return true;
-      return verified.has(i.wn_institutionid);
-    });
+    .filter((i): i is NonNullable<typeof i> => !!i);
 
   const ids = ordered.map((i) => i.wn_institutionid);
   if (!ids.length) return { items: [] };
@@ -73,7 +65,7 @@ export async function compareInstitutions(slugs: string[]) {
       const seats = seatsBy.get(id) ?? 0;
       return {
         id,
-        name: i.wn_name!,
+        name: publicName(i.wn_name),
         slug: publicSlug(i),
         logoUrl: i.wn_logourl,
         city: i.wn_city,

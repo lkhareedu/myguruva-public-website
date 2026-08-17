@@ -114,8 +114,7 @@ export const getInstitutionBySlug = cache(async function getInstitutionBySlug(
   const base = apiBase();
   const res = await fetch(`${base}/v1/institutions/${encodeURIComponent(slug)}`, {
     headers: { Accept: "application/json" },
-    // Short TTL so detail navigation feels instant after first hit
-    next: { revalidate: 60 },
+    cache: "no-store",
     redirect: "manual",
   });
   if (res.status === 404) return { kind: "notFound" };

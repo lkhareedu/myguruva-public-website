@@ -208,8 +208,16 @@ export function iso(d: Date | string | null | undefined): string | null {
 
 export function optList(
   set: keyof typeof maps,
-  values: number[] | null | undefined,
+  values: number[] | string | null | undefined,
 ): OptionValue[] {
-  if (!values?.length) return [];
-  return values.map((v) => requireOpt(set, v)).filter((o) => o.value !== -1);
+  const list = Array.isArray(values)
+    ? values
+    : typeof values === "string"
+      ? values
+          .split(/[,\s]+/)
+          .map((s) => Number(s))
+          .filter((n) => Number.isFinite(n))
+      : [];
+  if (!list.length) return [];
+  return list.map((v) => requireOpt(set, v)).filter((o) => o.value !== -1);
 }

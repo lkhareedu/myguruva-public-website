@@ -344,7 +344,7 @@ async function buildDetail(i: NonNullable<Awaited<ReturnType<typeof prisma.insti
     hasIcc: i.wn_hasicc,
     hasCounselling: i.wn_hascounselling,
     hasNssNcc: i.wn_hasnssncc,
-    updatedAt: i.updated_at.toISOString(),
+    updatedAt: iso(i.updated_at) ?? new Date().toISOString(),
     aliases: aliases.map((a) => ({
       name: a.wn_name ?? "",
       slug: a.wn_slug,
@@ -500,7 +500,13 @@ function asArr(v: unknown): any[] {
 }
 
 function uniq(vals: unknown[]): string[] {
-  return [...new Set(vals.filter((v): v is string => typeof v === "string" && !!v))];
+  return [
+    ...new Set(
+      vals
+        .map((v) => (typeof v === "string" ? asUuid(v) : null))
+        .filter((v): v is string => !!v),
+    ),
+  ];
 }
 
 function mapBy(rows: any[], key: string) {

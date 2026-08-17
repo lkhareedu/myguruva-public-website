@@ -76,6 +76,7 @@ v1.get("/institutions/:slug", async (req, res, next) => {
     res.setHeader("Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300");
     res.json(result.data);
   } catch (e) {
+    console.error(`GET /institutions/${req.params.slug} failed`, e);
     next(e);
   }
 });
